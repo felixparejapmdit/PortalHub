@@ -375,23 +375,18 @@
     <main class="flex-1 relative overflow-hidden flex flex-col">
                 <!-- VIEW: Sign-In Gate (Theme-Synchronized: Default Light Mode & Dark Mode Support) -->
         <div id="authSignInView" class="hidden flex-1 overflow-y-auto flex items-center justify-center p-4 sm:p-6 bg-slate-100 dark:bg-[#070e17] text-slate-800 dark:text-white transition-colors relative">
-            
-            <!-- Top-Left PortalHub Branding -->
-            <div class="absolute top-4 left-4 sm:top-6 sm:left-6 z-10 flex items-center space-x-2.5 select-none">
-                <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-                    <i class="fa-solid fa-network-wired text-xs sm:text-sm"></i>
-                </div>
-                <span class="font-extrabold text-base sm:text-lg tracking-tight text-slate-900 dark:text-white">Portal<span class="text-blue-600 dark:text-cyan-400">Hub</span></span>
-            </div>
-
-            <!-- Top-Right Theme Toggle Button (Synchronized with Dashboard) -->
-            <div class="absolute top-4 right-4 sm:top-6 sm:right-6 z-10">
-                <button type="button" onclick="toggleDarkMode()" title="Toggle Theme" class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-md flex items-center justify-center transition-all cursor-pointer">
-                    <i class="theme-icon-indicator fa-solid fa-moon text-sm"></i>
-                </button>
-            </div>
-
             <div class="max-w-[420px] w-full bg-white dark:bg-[#0b1320] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl shadow-slate-200/50 dark:shadow-2xl space-y-4 animate-in fade-in zoom-in-95 my-auto">
+                
+                <!-- PortalHub Branding Header (Centered in Card) -->
+                <div class="flex flex-col items-center justify-center text-center pt-1 pb-1">
+                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/25 mb-2.5">
+                        <i class="fa-solid fa-network-wired text-xl"></i>
+                    </div>
+                    <h2 class="font-black text-2xl tracking-tight text-slate-900 dark:text-white">
+                        Portal<span class="text-blue-600 dark:text-cyan-400">Hub</span>
+                    </h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">Unified Service Gateway & Dashboard</p>
+                </div>
                 
                 <!-- 1. "Continue with Google" Button -->
                 <button type="button" onclick="handleGoogleSignIn()" id="googleContinueBtn" class="w-full py-3 px-4 bg-white hover:bg-slate-50 dark:bg-[#1e293b] dark:hover:bg-[#28384f] text-slate-700 dark:text-white font-semibold text-xs rounded-xl border border-slate-300 dark:border-slate-700/60 shadow-sm flex items-center justify-center space-x-2.5 transition-all">
@@ -471,23 +466,15 @@
 
         <!-- VIEW: Awaiting Admin Approval Screen (Theme-Synchronized) -->
         <div id="authPendingView" class="hidden flex-1 overflow-y-auto flex items-center justify-center p-4 sm:p-6 bg-slate-100 dark:bg-[#070e17] text-slate-800 dark:text-white transition-colors relative">
-            
-            <!-- Top-Left PortalHub Branding -->
-            <div class="absolute top-4 left-4 sm:top-6 sm:left-6 z-10 flex items-center space-x-2.5 select-none">
-                <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-                    <i class="fa-solid fa-network-wired text-xs sm:text-sm"></i>
-                </div>
-                <span class="font-extrabold text-base sm:text-lg tracking-tight text-slate-900 dark:text-white">Portal<span class="text-blue-600 dark:text-cyan-400">Hub</span></span>
-            </div>
-
-            <!-- Top-Right Theme Toggle Button -->
-            <div class="absolute top-4 right-4 sm:top-6 sm:right-6 z-10">
-                <button type="button" onclick="toggleDarkMode()" title="Toggle Theme" class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-md flex items-center justify-center transition-all cursor-pointer">
-                    <i class="theme-icon-indicator fa-solid fa-moon text-sm"></i>
-                </button>
-            </div>
-
             <div class="max-w-md w-full flex flex-col items-center text-center animate-in fade-in zoom-in-95 my-auto">
+                
+                <!-- PortalHub Branding (Centered) -->
+                <div class="flex items-center space-x-2.5 mb-5 select-none">
+                    <div class="w-8 h-8 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+                        <i class="fa-solid fa-network-wired text-xs"></i>
+                    </div>
+                    <span class="font-extrabold text-base tracking-tight text-slate-900 dark:text-white">Portal<span class="text-blue-600 dark:text-cyan-400">Hub</span></span>
+                </div>
                 
                 <!-- Glowing Lock Badge with Clock Icon -->
                 <div class="w-20 h-20 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center relative mb-5">
