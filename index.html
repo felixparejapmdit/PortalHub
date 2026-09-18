@@ -547,6 +547,18 @@
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Table Pagination Footer (Page size: 15) -->
+                    <div id="tablePaginationFooter" class="px-5 py-3.5 border-t border-slate-100 dark:border-slate-700/70 bg-slate-50/70 dark:bg-slate-800/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                        <div class="flex items-center space-x-2">
+                            <span id="tablePaginationInfo" class="font-medium">Showing 0 services</span>
+                            <span class="text-slate-300 dark:text-slate-600">•</span>
+                            <span class="text-[11px] px-2 py-0.5 rounded-md bg-slate-200/60 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 font-mono">15 per page</span>
+                        </div>
+                        <div class="flex items-center space-x-1.5" id="tablePaginationControls">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
                 </div>
 
             </div>
@@ -889,6 +901,8 @@
         let currentActiveApp = null;
         let selectedCategoryFilter = 'All';
         let currentViewType = localStorage.getItem('myportal_view_type') || 'grid';
+        const TABLE_PAGE_SIZE = 15;
+        let tableCurrentPage = 1;
 
         function setViewType(type) {
             currentViewType = type;
@@ -1881,6 +1895,7 @@
 
         function filterAppsByCategory(category) {
             selectedCategoryFilter = category;
+            tableCurrentPage = 1;
             renderCategoryFilterBar();
             renderDashboardGrid();
         }
@@ -1921,6 +1936,7 @@
                         </tr>
                     `;
                 }
+                renderTablePagination(0, 1, 0, 0);
                 return;
             }
 
@@ -1960,9 +1976,18 @@
                 `).join('');
             }
 
-            // Populate Table View
+            // Populate Table View (Paginated: 15 per page)
+            const totalTableItems = filteredApps.length;
+            const totalTablePages = Math.max(1, Math.ceil(totalTableItems / TABLE_PAGE_SIZE));
+            if (tableCurrentPage > totalTablePages) tableCurrentPage = totalTablePages;
+            if (tableCurrentPage < 1) tableCurrentPage = 1;
+
+            const startIndex = (tableCurrentPage - 1) * TABLE_PAGE_SIZE;
+            const endIndex = Math.min(startIndex + TABLE_PAGE_SIZE, totalTableItems);
+            const pagedTableApps = filteredApps.slice(startIndex, endIndex);
+
             if (tableBody) {
-                tableBody.innerHTML = filteredApps.map(app => `
+                tableBody.innerHTML = pagedTableApps.map(app => `
                     <tr onclick="launchApp('${app.id}')" class="group hover:bg-slate-50/90 dark:hover:bg-slate-700/40 transition-colors cursor-pointer">
                         <td class="py-3.5 px-5">
                             <div class="flex items-center space-x-3">
@@ -2018,6 +2043,78 @@
                         </td>
                     </tr>
                 `).join('');
+            }
+
+            renderTablePagination(totalTableItems, totalTablePages, startIndex, endIndex);
+        }
+
+        // Render Table Pagination Controls
+        function renderTablePagination(totalItems, totalPages, startIdx, endIdx) {
+            const infoEl = document.getElementById('tablePaginationInfo');
+            const controlsEl = document.getElementById('tablePaginationControls');
+
+            if (!infoEl || !controlsEl) return;
+
+            if (totalItems === 0) {
+                infoEl.innerText = 'Showing 0 services';
+                controlsEl.innerHTML = '';
+                return;
+            }
+
+            infoEl.innerText = `Showing ${startIdx + 1}–${endIdx} of ${totalItems} services`;
+
+            let controlsHtml = '';
+
+            // Previous Button
+            const prevDisabled = tableCurrentPage <= 1;
+            controlsHtml += `
+                <button onclick="${prevDisabled ? '' : 'changeTablePage(' + (tableCurrentPage - 1) + ')'}" 
+                    ${prevDisabled ? 'disabled' : ''} 
+                    class="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 font-medium transition-all ${prevDisabled ? 'opacity-30 cursor-not-allowed text-slate-400' : 'hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:shadow-sm'}"
+                    title="Previous Page">
+                    <i class="fa-solid fa-chevron-left text-[10px]"></i>
+                </button>
+            `;
+
+            // Numbered Page Buttons
+            for (let p = 1; p <= totalPages; p++) {
+                if (totalPages > 6) {
+                    if (p !== 1 && p !== totalPages && Math.abs(p - tableCurrentPage) > 1) {
+                        if (p === 2 || p === totalPages - 1) {
+                            controlsHtml += `<span class="px-1 text-slate-400 text-xs select-none">…</span>`;
+                        }
+                        continue;
+                    }
+                }
+                const isActive = p === tableCurrentPage;
+                controlsHtml += `
+                    <button onclick="changeTablePage(${p})" 
+                        class="w-7 h-7 flex items-center justify-center rounded-lg text-xs font-semibold transition-all ${isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'}">
+                        ${p}
+                    </button>
+                `;
+            }
+
+            // Next Button
+            const nextDisabled = tableCurrentPage >= totalPages;
+            controlsHtml += `
+                <button onclick="${nextDisabled ? '' : 'changeTablePage(' + (tableCurrentPage + 1) + ')'}" 
+                    ${nextDisabled ? 'disabled' : ''} 
+                    class="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 font-medium transition-all ${nextDisabled ? 'opacity-30 cursor-not-allowed text-slate-400' : 'hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:shadow-sm'}"
+                    title="Next Page">
+                    <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                </button>
+            `;
+
+            controlsEl.innerHTML = controlsHtml;
+        }
+
+        function changeTablePage(page) {
+            tableCurrentPage = page;
+            renderDashboardGrid();
+            const wrapper = document.getElementById('mainAppTableWrapper');
+            if (wrapper) {
+                wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         }
 
