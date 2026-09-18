@@ -680,11 +680,11 @@
                     <div class="space-y-2">
                         <textarea id="firebaseConfigTextarea" rows="5" placeholder='{
   "apiKey": "AIzaSy...",
-  "authDomain": "ipon-pse-portfolio.firebaseapp.com",
-  "projectId": "ipon-pse-portfolio",
-  "storageBucket": "ipon-pse-portfolio.appspot.com",
-  "messagingSenderId": "...",
-  "appId": "..."
+  "authDomain": "portalhub-f3221.firebaseapp.com",
+  "projectId": "portalhub-f3221",
+  "storageBucket": "portalhub-f3221.firebasestorage.app",
+  "messagingSenderId": "856377438185",
+  "appId": "1:856377438185:web:..."
 }' class="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                         <div class="flex items-center space-x-2">
                             <button type="button" onclick="saveFirebaseConfig()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl">Save & Connect Firebase</button>
@@ -909,18 +909,26 @@
         const MAIN_ADMIN_EMAIL = 'felixpareja.pmdit07@gmail.com';
         
         const DEFAULT_FIREBASE_CONFIG = {
-            projectId: "ipon-pse-portfolio",
-            appId: "1:78974476091:web:09d65f9302ae090418611e",
-            storageBucket: "ipon-pse-portfolio.firebasestorage.app",
-            apiKey: "AIzaSyDs_ZqUwIY20Udq1hd1ArsyeT_y3Ld9wK0",
-            authDomain: "ipon-pse-portfolio.firebaseapp.com",
-            messagingSenderId: "78974476091"
+            projectId: "portalhub-f3221",
+            appId: "1:856377438185:web:76cad3031685fdf718e578",
+            storageBucket: "portalhub-f3221.firebasestorage.app",
+            apiKey: "AIzaSyAuDuhlsKwj7UUyeyaBkrIFGaV9SiMTfKA",
+            authDomain: "portalhub-f3221.firebaseapp.com",
+            messagingSenderId: "856377438185",
+            measurementId: "G-7D9H20MZQ4"
         };
 
         let currentUser = JSON.parse(localStorage.getItem('portal_auth_user')) || null;
         let approvedUsers = JSON.parse(localStorage.getItem('portal_approved_users')) || [MAIN_ADMIN_EMAIL];
         let pendingRequests = JSON.parse(localStorage.getItem('portal_access_requests')) || [];
-        let firebaseConfig = JSON.parse(localStorage.getItem('portal_firebase_config')) || DEFAULT_FIREBASE_CONFIG;
+        
+        // Auto-migrate from old project config if present in client localStorage
+        let savedConfig = JSON.parse(localStorage.getItem('portal_firebase_config'));
+        if (!savedConfig || savedConfig.projectId === 'ipon-pse-portfolio' || !savedConfig.apiKey) {
+            savedConfig = DEFAULT_FIREBASE_CONFIG;
+            localStorage.setItem('portal_firebase_config', JSON.stringify(DEFAULT_FIREBASE_CONFIG));
+        }
+        let firebaseConfig = savedConfig;
         let isFirebaseActive = false;
         let isRegisterMode = false;
 
@@ -1267,15 +1275,7 @@
 
         function loadDefaultFirebaseSample() {
             const textarea = document.getElementById('firebaseConfigTextarea');
-            const sample = {
-                apiKey: "AIzaSySampleKeyHere1234567890",
-                authDomain: "ipon-pse-portfolio.firebaseapp.com",
-                projectId: "ipon-pse-portfolio",
-                storageBucket: "ipon-pse-portfolio.appspot.com",
-                messagingSenderId: "123456789012",
-                appId: "1:123456789012:web:abcdef123456"
-            };
-            if (textarea) textarea.value = JSON.stringify(sample, null, 2);
+            if (textarea) textarea.value = JSON.stringify(DEFAULT_FIREBASE_CONFIG, null, 2);
         }
 
         function clearFirebaseConfig() {
