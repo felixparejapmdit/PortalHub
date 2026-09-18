@@ -1353,32 +1353,27 @@
                 if (!firestoreReqUnsubscribe) {
                     firestoreReqUnsubscribe = db.collection('access_requests').onSnapshot(snapshot => {
                         const currentApproved = JSON.parse(localStorage.getItem('portal_approved_users')) || [MAIN_ADMIN_EMAIL];
+                        const currentDeclined = JSON.parse(localStorage.getItem('portal_declined_users')) || [];
                         const cloudReqs = [];
                         snapshot.forEach(doc => {
                             const data = doc.data();
-                            const em = (data.email || '').toLowerCase();
-                            // Only include if status is pending AND email is NOT already approved
-                            if (data.status === 'pending' && em && !currentApproved.some(u => u.toLowerCase() === em)) {
+                            const em = (data.email || '').toLowerCase().trim();
+                            
+                            // If this email is declined, purge it from Firestore
+                            if (em && currentDeclined.some(u => u.toLowerCase() === em)) {
+                                doc.ref.delete().catch(() => {});
+                                return;
+                            }
+
+                            // Only include if status is pending AND email is NOT approved and NOT declined
+                            if (data.status === 'pending' && em && !currentApproved.some(u => u.toLowerCase() === em) && !currentDeclined.some(u => u.toLowerCase() === em)) {
                                 cloudReqs.push({ id: doc.id, ...data, email: em });
                             }
                         });
 
-                        // Merge cloud with any local pending requests (also filtering approved)
-                        const localReqs = (JSON.parse(localStorage.getItem('portal_access_requests')) || []).filter(r => 
-                            r && r.status === 'pending' && !currentApproved.some(u => u.toLowerCase() === (r.email || '').toLowerCase())
-                        );
+                        // Keep requests that are strictly pending, not approved, and not declined
                         const mergedMap = new Map();
                         cloudReqs.forEach(r => mergedMap.set(r.email, r));
-                        
-                        // Push un-synced local pending requests to Firestore
-                        localReqs.forEach(lr => {
-                            const em = (lr.email || '').toLowerCase();
-                            if (!mergedMap.has(em)) {
-                                mergedMap.set(em, lr);
-                                const docId = lr.id || ('req-' + em.replace(/[^a-zA-Z0-9]/g, '_'));
-                                db.collection('access_requests').doc(docId).set(lr, { merge: true }).catch(() => {});
-                            }
-                        });
 
                         pendingRequests = Array.from(mergedMap.values());
                         localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
@@ -1391,11 +1386,14 @@
                     });
                 }
 
-                // Real-time listener for approved users
+                // Real-time listener for approved & declined users
                 if (!firestoreUsersUnsubscribe) {
                     firestoreUsersUnsubscribe = db.collection('portal_settings').doc('access_control').onSnapshot(doc => {
                         if (doc.exists) {
                             const data = doc.data();
+                            if (Array.isArray(data.declinedUsers)) {
+                                localStorage.setItem('portal_declined_users', JSON.stringify(data.declinedUsers));
+                            }
                             if (Array.isArray(data.approvedUsers)) {
                                 approvedUsers = data.approvedUsers;
                                 if (!approvedUsers.some(u => u.toLowerCase() === MAIN_ADMIN_EMAIL.toLowerCase())) {
@@ -1403,18 +1401,28 @@
                                 }
                                 localStorage.setItem('portal_approved_users', JSON.stringify(approvedUsers));
 
-                                // Remove any pending requests that are now in approvedUsers
+                                const currentDeclined = JSON.parse(localStorage.getItem('portal_declined_users')) || [];
+
+                                // Remove any pending requests that are now in approvedUsers or declinedUsers
                                 pendingRequests = (JSON.parse(localStorage.getItem('portal_access_requests')) || []).filter(r => 
-                                    r && r.status === 'pending' && !approvedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase())
+                                    r && r.status === 'pending' && 
+                                    !approvedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase()) &&
+                                    !currentDeclined.some(u => u.toLowerCase() === (r.email || '').toLowerCase())
                                 );
                                 localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
 
                                 // If this client is pending and now approved: AUTO-ENTER PortalHub!
-                                if (currentUser && currentUser.status === 'pending' && approvedUsers.some(u => u.toLowerCase() === (currentUser.email || '').toLowerCase())) {
-                                    currentUser.status = 'approved';
-                                    currentUser.role = currentUser.email.toLowerCase() === MAIN_ADMIN_EMAIL.toLowerCase() ? 'admin' : 'member';
-                                    localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
-                                    showToast('Access Approved by Admin! Entering PortalHub...');
+                                if (currentUser && currentUser.status === 'pending') {
+                                    const myEmail = (currentUser.email || '').toLowerCase();
+                                    if (approvedUsers.some(u => u.toLowerCase() === myEmail)) {
+                                        currentUser.status = 'approved';
+                                        currentUser.role = myEmail === MAIN_ADMIN_EMAIL.toLowerCase() ? 'admin' : 'member';
+                                        localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
+                                        showToast('Access Approved by Admin! Entering PortalHub...');
+                                    } else if (currentDeclined.some(u => u.toLowerCase() === myEmail)) {
+                                        currentUser.status = 'declined';
+                                        localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
+                                    }
                                 }
 
                                 updateAuthUI();
@@ -1496,12 +1504,17 @@
                 }
                 approvedUsers = localApproved;
 
+                const rawDeclined = localStorage.getItem('portal_declined_users');
+                const declinedUsers = JSON.parse(rawDeclined) || [];
+
                 const rawRequests = localStorage.getItem('portal_access_requests');
                 let localReqs = (JSON.parse(rawRequests) || []).filter(r => 
-                    r && r.status === 'pending' && !approvedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase())
+                    r && r.status === 'pending' && 
+                    !approvedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase()) &&
+                    !declinedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase())
                 );
 
-                // If user is pending, check if newly approved
+                // If user is pending, check if newly approved or declined
                 if (currentUser && currentUser.status === 'pending') {
                     const userEmail = (currentUser.email || '').toLowerCase();
                     if (approvedUsers.some(u => u.toLowerCase() === userEmail)) {
@@ -1509,6 +1522,12 @@
                         currentUser.role = userEmail === MAIN_ADMIN_EMAIL.toLowerCase() ? 'admin' : 'member';
                         localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
                         showToast('Access Approved by Admin! Entering PortalHub...');
+                        updateAuthUI();
+                        return;
+                    }
+                    if (declinedUsers.some(u => u.toLowerCase() === userEmail)) {
+                        currentUser.status = 'declined';
+                        localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
                         updateAuthUI();
                         return;
                     }
@@ -1523,8 +1542,15 @@
                         let hasChanges = false;
                         snapshot.forEach(doc => {
                             const r = doc.data();
-                            const em = (r.email || '').toLowerCase();
-                            if (em && !approvedUsers.some(u => u.toLowerCase() === em)) {
+                            const em = (r.email || '').toLowerCase().trim();
+                            
+                            // If this email was declined, delete rogue document from Firestore!
+                            if (declinedUsers.some(u => u.toLowerCase() === em)) {
+                                doc.ref.delete().catch(() => {});
+                                return;
+                            }
+
+                            if (em && !approvedUsers.some(u => u.toLowerCase() === em) && !declinedUsers.some(u => u.toLowerCase() === em)) {
                                 if (!localReqs.some(lr => (lr.email || '').toLowerCase() === em)) {
                                     localReqs.unshift({ id: doc.id, ...r, email: em });
                                     hasChanges = true;
@@ -1847,15 +1873,20 @@
             const pendingBadge = document.getElementById('navPendingBadge');
             const dropdownBadge = document.getElementById('dropdownPendingBadge');
             
-            // Refresh pending requests and approved users from storage
+            // Refresh pending requests, approved users, and declined users from storage
             approvedUsers = JSON.parse(localStorage.getItem('portal_approved_users')) || [MAIN_ADMIN_EMAIL];
             if (!approvedUsers.some(u => u.toLowerCase() === MAIN_ADMIN_EMAIL.toLowerCase())) {
                 approvedUsers.unshift(MAIN_ADMIN_EMAIL);
             }
 
-            // STRICT FILTER: pendingRequests must be status 'pending' AND NOT already in approvedUsers
+            const rawDeclined = localStorage.getItem('portal_declined_users');
+            const declinedUsers = JSON.parse(rawDeclined) || [];
+
+            // STRICT FILTER: pendingRequests must be status 'pending' AND NOT in approvedUsers AND NOT in declinedUsers
             pendingRequests = (JSON.parse(localStorage.getItem('portal_access_requests')) || []).filter(r => 
-                r && r.status === 'pending' && !approvedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase())
+                r && r.status === 'pending' && 
+                !approvedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase().trim()) &&
+                !declinedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase().trim())
             );
             localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
 
@@ -1873,8 +1904,8 @@
                 return;
             }
 
-            if (currentUser.status === 'pending') {
-                // Awaiting Admin Approval: HIDE HEADER & MENU BAR COMPLETELY
+            if (currentUser.status === 'pending' || currentUser.status === 'declined') {
+                // Awaiting Admin Approval or Declined: HIDE HEADER & MENU BAR COMPLETELY
                 if (signInView) signInView.classList.add('hidden');
                 if (pendingView) pendingView.classList.remove('hidden');
                 if (dashboardView) dashboardView.classList.add('hidden');
@@ -1996,9 +2027,14 @@
                 approvedUsers.unshift(MAIN_ADMIN_EMAIL);
             }
 
-            // Exclude already approved users and only keep actual pending items
+            const rawDeclined = localStorage.getItem('portal_declined_users');
+            const declinedUsers = JSON.parse(rawDeclined) || [];
+
+            // Exclude already approved users and declined users
             pendingRequests = (JSON.parse(localStorage.getItem('portal_access_requests')) || []).filter(r => 
-                r && r.status === 'pending' && !approvedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase())
+                r && r.status === 'pending' && 
+                !approvedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase().trim()) &&
+                !declinedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase().trim())
             );
             localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
 
@@ -2036,11 +2072,11 @@
                                     </div>
                                 </div>
                                 <div class="flex items-center space-x-2 shrink-0">
-                                    <button onclick="approveAccessRequest('${req.id}')" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center space-x-1.5 shadow-sm transition-colors">
+                                    <button onclick="approveAccessRequest('${req.id}', '${req.email}')" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center space-x-1.5 shadow-sm transition-colors cursor-pointer">
                                         <i class="fa-solid fa-check text-[11px]"></i>
                                         <span>Approve</span>
                                     </button>
-                                    <button onclick="declineAccessRequest('${req.id}')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-[#be123c]/40 dark:hover:bg-[#be123c]/60 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-xs font-semibold rounded-xl flex items-center space-x-1 transition-colors">
+                                    <button onclick="declineAccessRequest('${req.id}', '${req.email}')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-[#be123c]/40 dark:hover:bg-[#be123c]/60 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-xs font-semibold rounded-xl flex items-center space-x-1 transition-colors cursor-pointer">
                                         <i class="fa-solid fa-xmark text-[11px]"></i>
                                         <span>Decline</span>
                                     </button>
@@ -2061,7 +2097,7 @@
                             ${email.toLowerCase() === MAIN_ADMIN_EMAIL.toLowerCase() ? '<span class="text-[10px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 rounded">Admin</span>' : ''}
                         </div>
                         ${email.toLowerCase() !== MAIN_ADMIN_EMAIL.toLowerCase() ? `
-                            <button onclick="revokeApprovedUser('${email}')" title="Revoke Access" class="text-slate-400 hover:text-rose-500 transition-colors p-1">
+                            <button onclick="revokeApprovedUser('${email}')" title="Revoke Access" class="text-slate-400 hover:text-rose-500 transition-colors p-1 cursor-pointer">
                                 <i class="fa-solid fa-trash text-xs"></i>
                             </button>
                         ` : ''}
@@ -2070,11 +2106,22 @@
             }
         }
 
-        async function approveAccessRequest(reqId) {
-            const req = pendingRequests.find(r => r.id === reqId);
-            if (!req) return;
+        async function approveAccessRequest(reqId, reqEmail) {
+            let targetEmail = (reqEmail || '').toLowerCase().trim();
+            if (!targetEmail && reqId) {
+                const found = pendingRequests.find(r => r.id === reqId);
+                if (found && found.email) targetEmail = found.email.toLowerCase().trim();
+            }
+            if (!targetEmail) {
+                showToast('Unable to identify request to approve');
+                return;
+            }
 
-            const targetEmail = (req.email || '').toLowerCase();
+            // Remove from declined list if previously marked declined
+            let rawDeclined = localStorage.getItem('portal_declined_users');
+            let declinedUsers = JSON.parse(rawDeclined) || [];
+            declinedUsers = declinedUsers.filter(u => u.toLowerCase() !== targetEmail);
+            localStorage.setItem('portal_declined_users', JSON.stringify(declinedUsers));
 
             if (!approvedUsers.some(u => u.toLowerCase() === targetEmail)) {
                 approvedUsers.push(targetEmail);
@@ -2082,56 +2129,107 @@
             }
 
             // Purge ALL pending requests for this email!
-            pendingRequests = pendingRequests.filter(r => (r.email || '').toLowerCase() !== targetEmail);
+            pendingRequests = pendingRequests.filter(r => (r.email || '').toLowerCase().trim() !== targetEmail && r.id !== reqId);
             localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
+
+            showToast(`Approved access for ${targetEmail}`);
+            renderAccessRequestsList();
+            updateAuthUI();
+            notifyAccessRequestsChanged();
 
             // Sync to Firestore if available
             if (isFirebaseActive && window.firebase && firebase.firestore) {
                 try {
                     const db = firebase.firestore();
-                    await db.collection('access_requests').doc(reqId).set({ status: 'approved' }, { merge: true });
+                    await db.collection('portal_settings').doc('access_control').set({
+                        approvedUsers: approvedUsers,
+                        declinedUsers: declinedUsers
+                    }, { merge: true });
+
                     const cleanDocId = 'req-' + targetEmail.replace(/[^a-zA-Z0-9]/g, '_');
-                    await db.collection('access_requests').doc(cleanDocId).set({ status: 'approved' }, { merge: true });
+                    if (reqId) {
+                        db.collection('access_requests').doc(reqId).set({ status: 'approved' }, { merge: true }).catch(() => {});
+                    }
+                    db.collection('access_requests').doc(cleanDocId).set({ status: 'approved' }, { merge: true }).catch(() => {});
 
-                    const q = await db.collection('access_requests').where('email', '==', targetEmail).get();
-                    q.forEach(doc => doc.ref.set({ status: 'approved' }, { merge: true }));
-
-                    await db.collection('portal_settings').doc('access_control').set({ approvedUsers: approvedUsers }, { merge: true });
+                    const allReqs = await db.collection('access_requests').get();
+                    allReqs.forEach(doc => {
+                        const data = doc.data();
+                        if ((data.email || '').toLowerCase().trim() === targetEmail) {
+                            doc.ref.set({ status: 'approved' }, { merge: true }).catch(() => {});
+                        }
+                    });
                 } catch(e) { console.warn('Firestore approve sync notice:', e); }
             }
-
-            showToast(`Approved access for ${req.name || req.email}`);
-            renderAccessRequestsList();
-            updateAuthUI();
-            notifyAccessRequestsChanged();
         }
 
-        async function declineAccessRequest(reqId) {
-            const req = pendingRequests.find(r => r.id === reqId);
-            if (!req) return;
+        async function declineAccessRequest(reqId, reqEmail) {
+            let targetEmail = (reqEmail || '').toLowerCase().trim();
+            if (!targetEmail && reqId) {
+                const found = pendingRequests.find(r => r.id === reqId);
+                if (found && found.email) targetEmail = found.email.toLowerCase().trim();
+            }
 
-            const targetEmail = (req.email || '').toLowerCase();
+            if (!targetEmail) {
+                showToast('Unable to identify request to decline');
+                return;
+            }
 
-            pendingRequests = pendingRequests.filter(r => (r.email || '').toLowerCase() !== targetEmail);
+            // 1. Add to declinedUsers list in localStorage
+            let rawDeclined = localStorage.getItem('portal_declined_users');
+            let declinedUsers = JSON.parse(rawDeclined) || [];
+            if (!declinedUsers.some(u => u.toLowerCase() === targetEmail)) {
+                declinedUsers.push(targetEmail);
+            }
+            localStorage.setItem('portal_declined_users', JSON.stringify(declinedUsers));
+
+            // 2. Remove from pendingRequests immediately
+            pendingRequests = pendingRequests.filter(r => 
+                (r.email || '').toLowerCase().trim() !== targetEmail && r.id !== reqId
+            );
             localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
 
-            // Sync to Firestore if available
+            // 3. Immediately update UI so the modal reflects the removal instantly
+            renderAccessRequestsList();
+            updateAuthUI();
+            showToast(`Declined request for ${targetEmail}`);
+            notifyAccessRequestsChanged();
+
+            // 4. Clean up Firestore in background
             if (isFirebaseActive && window.firebase && firebase.firestore) {
                 try {
                     const db = firebase.firestore();
-                    await db.collection('access_requests').doc(reqId).set({ status: 'declined' }, { merge: true });
+                    
+                    // Update access_control with declinedUsers
+                    await db.collection('portal_settings').doc('access_control').set({
+                        declinedUsers: declinedUsers,
+                        approvedUsers: approvedUsers
+                    }, { merge: true });
+
                     const cleanDocId = 'req-' + targetEmail.replace(/[^a-zA-Z0-9]/g, '_');
-                    await db.collection('access_requests').doc(cleanDocId).set({ status: 'declined' }, { merge: true });
+                    if (reqId) {
+                        db.collection('access_requests').doc(reqId).delete().catch(() => {
+                            db.collection('access_requests').doc(reqId).set({ status: 'declined' }, { merge: true }).catch(() => {});
+                        });
+                    }
+                    db.collection('access_requests').doc(cleanDocId).delete().catch(() => {
+                        db.collection('access_requests').doc(cleanDocId).set({ status: 'declined' }, { merge: true }).catch(() => {});
+                    });
 
-                    const q = await db.collection('access_requests').where('email', '==', targetEmail).get();
-                    q.forEach(doc => doc.ref.set({ status: 'declined' }, { merge: true }));
-                } catch(e) { console.warn('Firestore decline sync notice:', e); }
+                    // Delete any other docs in access_requests with this email
+                    const allReqs = await db.collection('access_requests').get();
+                    allReqs.forEach(doc => {
+                        const data = doc.data();
+                        if ((data.email || '').toLowerCase().trim() === targetEmail) {
+                            doc.ref.delete().catch(() => {
+                                doc.ref.set({ status: 'declined' }, { merge: true }).catch(() => {});
+                            });
+                        }
+                    });
+                } catch(e) {
+                    console.warn('Firestore decline cleanup notice:', e);
+                }
             }
-
-            showToast(`Declined request for ${req.name || req.email}`);
-            renderAccessRequestsList();
-            updateAuthUI();
-            notifyAccessRequestsChanged();
         }
 
         async function handlePreApproveSubmit(e) {
