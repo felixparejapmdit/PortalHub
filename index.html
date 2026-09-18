@@ -1320,15 +1320,13 @@
                         }
                     }).catch(err => console.log('Redirect result notice:', err));
 
-                    // If logged in user in localStorage is not an approved member: auto-logout immediately
+                    // Ensure unapproved users remain in pending status awaiting admin approval
                     if (currentUser && !isCurrentUserAdmin() && currentUser.role !== 'guest') {
                         const userEm = (currentUser.email || '').toLowerCase().trim();
                         if (!approvedUsers.some(u => (u || '').toLowerCase().trim() === userEm)) {
-                            currentUser = null;
-                            localStorage.removeItem('portal_auth_user');
-                            if (window.firebase && firebase.auth) {
-                                try { firebase.auth().signOut(); } catch(e) {}
-                            }
+                            currentUser.status = 'pending';
+                            currentUser.role = 'requester';
+                            localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
                         }
                     }
 
@@ -1405,16 +1403,20 @@
                                 );
                                 localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
 
-                                // Automatically logout any logged in user who is not in approvedUsers
+                                // Keep pending/approved state synchronized in real-time
                                 if (currentUser && !isCurrentUserAdmin() && currentUser.role !== 'guest') {
                                     const myEmail = (currentUser.email || '').toLowerCase().trim();
-                                    if (!approvedUsers.some(u => (u || '').toLowerCase().trim() === myEmail)) {
-                                        currentUser = null;
-                                        localStorage.removeItem('portal_auth_user');
-                                        if (window.firebase && firebase.auth) {
-                                            try { firebase.auth().signOut(); } catch(e) {}
+                                    if (approvedUsers.some(u => (u || '').toLowerCase().trim() === myEmail)) {
+                                        if (currentUser.status !== 'approved') {
+                                            currentUser.status = 'approved';
+                                            currentUser.role = 'member';
+                                            localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
+                                            showToast('Access Approved by Admin! Entering PortalHub...');
                                         }
-                                        showToast('Access not approved. Automatically logged out.');
+                                    } else {
+                                        currentUser.status = 'pending';
+                                        currentUser.role = 'requester';
+                                        localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
                                     }
                                 }
 
@@ -1497,18 +1499,20 @@
                 }
                 approvedUsers = localApproved;
 
-                // If non-admin logged in user is no longer in approvedUsers: auto-logout immediately!
+                // Keep logged in user state synchronized with approvedUsers in real-time
                 if (currentUser && !isCurrentUserAdmin() && currentUser.role !== 'guest') {
                     const myEmail = (currentUser.email || '').toLowerCase().trim();
-                    if (!approvedUsers.some(u => (u || '').toLowerCase().trim() === myEmail)) {
-                        currentUser = null;
-                        localStorage.removeItem('portal_auth_user');
-                        if (window.firebase && firebase.auth) {
-                            try { firebase.auth().signOut(); } catch(e) {}
+                    if (approvedUsers.some(u => (u || '').toLowerCase().trim() === myEmail)) {
+                        if (currentUser.status !== 'approved') {
+                            currentUser.status = 'approved';
+                            currentUser.role = 'member';
+                            localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
+                            showToast('Access Approved by Admin! Entering PortalHub...');
                         }
-                        showToast('Access not approved. Automatically logged out.');
-                        updateAuthUI();
-                        return;
+                    } else {
+                        currentUser.status = 'pending';
+                        currentUser.role = 'requester';
+                        localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
                     }
                 }
 
@@ -1787,14 +1791,13 @@
                     }
                 }
 
-                // 3. AUTOMATICALLY LOGOUT: Non-approved members are never kept logged in
-                if (window.firebase && firebase.auth) {
-                    try { await firebase.auth().signOut(); } catch(e) {}
-                }
-                currentUser = null;
-                localStorage.removeItem('portal_auth_user');
+                // 3. Keep user in pending state and show Awaiting Approval Screen (DO NOT ENTER DASHBOARD)
+                userData.role = 'requester';
+                userData.status = 'pending';
+                currentUser = userData;
+                localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
 
-                showToast('Access request submitted to Admin! As you are not an approved member, you have been automatically logged out. Please wait for Admin approval.');
+                showToast('Access request submitted! Awaiting Admin approval.');
                 updateAuthUI();
                 notifyAccessRequestsChanged();
             }
@@ -1936,19 +1939,26 @@
             const isApproved = isAdmin || isGuest || approvedUsers.some(u => (u || '').toLowerCase().trim() === userEmail);
 
             if (!isApproved) {
-                // User is not an approved member! AUTOMATICALLY LOGOUT as requested!
-                currentUser = null;
-                localStorage.removeItem('portal_auth_user');
-                if (window.firebase && firebase.auth) {
-                    try { firebase.auth().signOut(); } catch(e) {}
-                }
-                if (signInView) signInView.classList.remove('hidden');
-                if (pendingView) pendingView.classList.add('hidden');
+                // User is NOT an approved member: SHOW PENDING SCREEN ONLY, KEEP DASHBOARD & HEADER HIDDEN
+                currentUser.status = 'pending';
+                currentUser.role = 'requester';
+                localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
+
+                if (signInView) signInView.classList.add('hidden');
+                if (pendingView) pendingView.classList.remove('hidden');
                 if (dashboardView) dashboardView.classList.add('hidden');
                 if (activeAppView) activeAppView.classList.add('hidden');
                 if (header) header.classList.add('hidden');
                 const userMenu = document.getElementById('userDropdownMenu');
                 if (userMenu) userMenu.classList.add('hidden');
+
+                const emailDisp = document.getElementById('pendingUserEmailDisplay');
+                if (emailDisp) emailDisp.innerText = currentUser.email;
+
+                const letterDisp = document.getElementById('pendingAvatarLetter');
+                if (letterDisp) letterDisp.innerText = (currentUser.name || currentUser.email).charAt(0).toUpperCase();
+
+                if (navReqBtn) navReqBtn.classList.add('hidden');
                 return;
             }
 
