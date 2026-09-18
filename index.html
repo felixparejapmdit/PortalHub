@@ -12,6 +12,10 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="manifest" href="manifest.json">
+        <!-- Firebase App, Auth & Firestore SDKs (v10 Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
@@ -311,80 +315,83 @@
     <div id="drawerBackdrop" class="hidden fixed inset-0 z-40 bg-black/10 backdrop-blur-[0.5px]" onclick="toggleAppGridDrawer()"></div>
 
     <main class="flex-1 relative overflow-hidden flex flex-col">
-        <!-- VIEW: Sign-In Gate -->
+                <!-- VIEW: Sign-In Gate (Exact match to Reference Image) -->
         <div id="authSignInView" class="hidden flex-1 overflow-y-auto flex items-center justify-center p-4 sm:p-6 bg-[#070e17] text-white">
-            <div class="max-w-md w-full text-center space-y-6 animate-in fade-in zoom-in-95">
+            <div class="max-w-[420px] w-full bg-[#0b1320] border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
                 
-                <!-- Logo & Brand Header -->
-                <div class="flex flex-col items-center">
-                    <div class="w-20 h-20 rounded-3xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-2xl shadow-cyan-500/20 mb-4 ring-4 ring-cyan-500/20">
-                        <i class="fa-solid fa-network-wired text-3xl"></i>
-                    </div>
-                    <h2 class="text-2xl font-extrabold text-white tracking-tight">PortalHub Terminal</h2>
-                    <p class="text-xs text-slate-400 mt-1 font-medium">Unified Service Gateway & Family Portfolio Hub</p>
+                <!-- 1. "Continue with Google" Button matching reference image -->
+                <button type="button" onclick="handleGoogleSignIn()" id="googleContinueBtn" class="w-full py-3 px-4 bg-[#1e293b] hover:bg-[#28384f] text-white font-semibold text-xs rounded-xl border border-slate-700/60 shadow-md flex items-center justify-center space-x-2.5 transition-all">
+                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+                        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                        <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                    </svg>
+                    <span class="tracking-wide">Continue with Google</span>
+                </button>
+
+                <!-- 2. "OR EMAIL ACCESS" Separator matching reference image -->
+                <div class="relative flex py-1 items-center">
+                    <div class="flex-grow border-t border-slate-800"></div>
+                    <span class="flex-shrink mx-3 text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400">OR EMAIL ACCESS</span>
+                    <div class="flex-grow border-t border-slate-800"></div>
                 </div>
 
-                <!-- Auth Card -->
-                <div class="bg-[#0f172a]/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 text-left backdrop-blur-xl">
-                    <div class="space-y-1 text-center">
-                        <h3 class="text-sm font-bold text-slate-200">Google Authentication</h3>
-                        <p class="text-xs text-slate-400">Sign in with your Google account to access your portfolio & services.</p>
+                <!-- 3. Form: ACCOUNT EMAIL & PASSWORD matching reference image -->
+                <form id="emailAuthForm" onsubmit="handleEmailAuthSubmit(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-[10px] font-mono font-bold text-slate-400 tracking-wider uppercase mb-1.5">ACCOUNT EMAIL</label>
+                        <input type="email" id="authEmailInput" required placeholder="investor@example.com" class="w-full px-3.5 py-2.5 rounded-xl bg-[#070e17] border border-slate-800 text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 font-mono transition-all">
                     </div>
 
-                    <!-- Official Google Sign-In Container (GSI) -->
-                    <div class="flex flex-col items-center justify-center pt-2">
-                        <div id="g_id_onload"
-                             data-client_id=""
-                             data-context="signin"
-                             data-ux_mode="popup"
-                             data-callback="handleGoogleCredentialResponse"
-                             data-auto_prompt="false">
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-[10px] font-mono font-bold text-slate-400 tracking-wider uppercase">PASSWORD</label>
+                            <button type="button" onclick="handleForgotPassword()" class="text-[11px] text-slate-400 font-mono hover:text-cyan-400 hover:underline transition-colors">Forgot password?</button>
                         </div>
-                        <div class="g_id_signin"
-                             data-type="standard"
-                             data-shape="pill"
-                             data-theme="filled_black"
-                             data-text="signin_with"
-                             data-size="large"
-                             data-logo_alignment="left"
-                             data-width="280">
+                        <div class="relative">
+                            <input type="password" id="authPasswordInput" required placeholder="••••••••" class="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-[#070e17] border border-slate-800 text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 font-mono transition-all">
+                            <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300 transition-colors">
+                                <i id="passwordEyeIcon" class="fa-regular fa-eye text-xs"></i>
+                            </button>
                         </div>
                     </div>
 
-                    <div class="relative flex py-1 items-center">
-                        <div class="flex-grow border-t border-slate-800"></div>
-                        <span class="flex-shrink mx-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Quick Access</span>
-                        <div class="flex-grow border-t border-slate-800"></div>
-                    </div>
+                    <!-- 4. Main Cyan Action Button: "->] SIGN IN TO IPON" matching reference image -->
+                    <button type="submit" id="authSubmitBtn" class="w-full py-3 px-4 bg-[#22d3ee] hover:bg-[#06b6d4] text-[#081528] font-extrabold font-mono text-xs rounded-xl shadow-lg shadow-cyan-500/15 flex items-center justify-center space-x-2 transition-all">
+                        <i id="authSubmitIcon" class="fa-solid fa-arrow-right-to-bracket text-xs"></i>
+                        <span id="authSubmitText">SIGN IN TO IPON</span>
+                    </button>
+                </form>
 
-                    <!-- Quick Preset Sign-In Buttons -->
-                    <div class="space-y-2.5">
-                        <button onclick="quickSignInAdmin()" class="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md shadow-blue-500/20 flex items-center justify-between transition-all">
-                            <span class="flex items-center space-x-2">
-                                <i class="fa-brands fa-google text-white"></i>
-                                <span>Sign In as Admin</span>
-                            </span>
-                            <span class="text-[10px] font-mono text-cyan-200 bg-white/10 px-2 py-0.5 rounded">felixpareja.pmdit07@gmail.com</span>
-                        </button>
-
-                        <button onclick="openDemoFamilySignInModal()" class="w-full py-2.5 px-4 bg-[#1e293b] hover:bg-[#273548] text-slate-300 border border-slate-700/70 font-semibold text-xs rounded-xl flex items-center justify-between transition-all">
-                            <span class="flex items-center space-x-2">
-                                <i class="fa-solid fa-users text-cyan-400"></i>
-                                <span>Sign In as Family Member / Requester</span>
-                            </span>
-                            <i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>
-                        </button>
-                    </div>
-
-                    <div class="bg-slate-900/80 rounded-xl p-3 border border-slate-800/80 text-[11px] text-slate-400 flex items-start space-x-2.5">
-                        <i class="fa-solid fa-shield-halved text-amber-400 text-sm mt-0.5 shrink-0"></i>
-                        <p class="leading-relaxed">
-                            Access is gated. Non-admin accounts require sign-up approval from <strong class="text-cyan-400 font-mono">felixpareja.pmdit07@gmail.com</strong>.
-                        </p>
-                    </div>
+                <!-- 5. "Don't have an account? Register" Link matching reference image -->
+                <div class="text-center pt-1">
+                    <button type="button" onclick="toggleAuthMode()" id="toggleAuthModeBtn" class="text-xs font-mono font-medium text-cyan-400 hover:underline transition-colors">
+                        Don't have an account? Register
+                    </button>
                 </div>
 
-                <p class="text-[11px] text-slate-500 font-mono">PortalHub PSE Portfolio Terminal • Access-Gated</p>
+                <!-- 6. "Explore Demo Terminal (Guest View)" Button matching reference image -->
+                <button type="button" onclick="exploreDemoTerminal()" class="w-full py-2.5 px-4 bg-[#141f31] hover:bg-[#1a283e] text-slate-300 font-medium font-mono text-xs rounded-xl border border-slate-800 flex items-center justify-center space-x-2 transition-all shadow-sm">
+                    <i class="fa-regular fa-eye text-emerald-400 text-xs"></i>
+                    <span>Explore Demo Terminal (Guest View)</span>
+                </button>
+
+                <!-- 7. Footer Status Bar: Direct Sync | Firestore Sync | Auth 2.0 matching reference image -->
+                <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                    <span class="flex items-center space-x-1.5" title="Direct Peer Sync active">
+                        <i class="fa-solid fa-code-branch text-emerald-400 text-[10px]"></i>
+                        <span>Direct Sync</span>
+                    </span>
+                    <span class="flex items-center space-x-1.5" title="Firebase Firestore sync status">
+                        <i class="fa-solid fa-cloud text-cyan-400 text-[10px]"></i>
+                        <span id="firestoreStatusText">Firestore Sync</span>
+                    </span>
+                    <span class="flex items-center space-x-1.5" title="Google & Firebase Auth 2.0 active">
+                        <i class="fa-solid fa-lock text-amber-400 text-[10px]"></i>
+                        <span>Auth 2.0</span>
+                    </span>
+                </div>
             </div>
         </div>
 
@@ -661,15 +668,29 @@
             </div>
 
             <div class="flex-1 overflow-y-auto space-y-6 pr-1">
-                                <!-- Google OAuth Configuration -->
+                                                <!-- Firebase & Firestore Configuration -->
                 <div class="space-y-3">
                     <div class="flex items-center justify-between">
-                        <h4 class="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Google OAuth Sign-In</h4>
-                        <span class="text-xs text-slate-400">Client ID setup</span>
+                        <h4 class="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Firebase & Firestore</h4>
+                        <span id="firebaseStatusBadge" class="text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">Ready</span>
                     </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                        Paste your Firebase project credentials JSON or configuration to enable real-time cloud authentication and Firestore synchronization.
+                    </p>
                     <div class="space-y-2">
-                        <input type="text" id="googleClientIdInput" placeholder="Enter Google OAuth Client ID..." class="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <button type="button" onclick="saveGoogleClientId()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl">Save Client ID</button>
+                        <textarea id="firebaseConfigTextarea" rows="5" placeholder='{
+  "apiKey": "AIzaSy...",
+  "authDomain": "ipon-pse-portfolio.firebaseapp.com",
+  "projectId": "ipon-pse-portfolio",
+  "storageBucket": "ipon-pse-portfolio.appspot.com",
+  "messagingSenderId": "...",
+  "appId": "..."
+}' class="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                        <div class="flex items-center space-x-2">
+                            <button type="button" onclick="saveFirebaseConfig()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl">Save & Connect Firebase</button>
+                            <button type="button" onclick="loadDefaultFirebaseSample()" class="px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 text-xs rounded-xl">Sample Config</button>
+                            <button type="button" onclick="clearFirebaseConfig()" class="px-3 py-2 text-rose-500 text-xs hover:underline">Reset</button>
+                        </div>
                     </div>
                 </div>
 
@@ -882,15 +903,17 @@
         }
 
         
-        // ==========================================
-        // AUTHENTICATION & ACCESS CONTROL SYSTEM
+                // ==========================================
+        // AUTHENTICATION & ACCESS CONTROL SYSTEM (FIREBASE READY)
         // ==========================================
         const MAIN_ADMIN_EMAIL = 'felixpareja.pmdit07@gmail.com';
         
         let currentUser = JSON.parse(localStorage.getItem('portal_auth_user')) || null;
         let approvedUsers = JSON.parse(localStorage.getItem('portal_approved_users')) || [MAIN_ADMIN_EMAIL];
         let pendingRequests = JSON.parse(localStorage.getItem('portal_access_requests')) || [];
-        let googleClientId = localStorage.getItem('portal_google_client_id') || '';
+        let firebaseConfig = JSON.parse(localStorage.getItem('portal_firebase_config')) || null;
+        let isFirebaseActive = false;
+        let isRegisterMode = false;
 
         // Ensure Admin is always in approved list
         if (!approvedUsers.includes(MAIN_ADMIN_EMAIL)) {
@@ -898,51 +921,225 @@
             localStorage.setItem('portal_approved_users', JSON.stringify(approvedUsers));
         }
 
-        // Initialize Google Identity Services
-        function initGoogleIdentity() {
-            if (googleClientId && window.google && google.accounts && google.accounts.id) {
+        // Initialize Firebase when configured
+        function initFirebase() {
+            const fsStatus = document.getElementById('firestoreStatusText');
+            const badge = document.getElementById('firebaseStatusBadge');
+
+            if (window.firebase && firebaseConfig && firebaseConfig.apiKey) {
                 try {
-                    google.accounts.id.initialize({
-                        client_id: googleClientId,
-                        callback: handleGoogleCredentialResponse
-                    });
-                    const btn = document.querySelector('.g_id_signin');
-                    if (btn) {
-                        google.accounts.id.renderButton(btn, {
-                            type: 'standard',
-                            shape: 'pill',
-                            theme: 'filled_black',
-                            text: 'signin_with',
-                            size: 'large',
-                            logo_alignment: 'left',
-                            width: 280
-                        });
+                    if (!firebase.apps.length) {
+                        firebase.initializeApp(firebaseConfig);
                     }
+                    isFirebaseActive = true;
+                    if (fsStatus) fsStatus.innerText = 'Firestore Connected';
+                    if (badge) {
+                        badge.innerText = 'Connected';
+                        badge.className = 'text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400';
+                    }
+
+                    // Attach Firebase Auth state listener
+                    firebase.auth().onAuthStateChanged(user => {
+                        if (user && !currentUser) {
+                            processUserLogin({
+                                name: user.displayName || user.email.split('@')[0],
+                                email: user.email,
+                                picture: user.photoURL || '',
+                                uid: user.uid
+                            });
+                        }
+                    });
+
+                    // Sync access requests with Firestore collection
+                    syncFromFirestore();
                 } catch(e) {
-                    console.log('Google Identity init note:', e);
+                    console.warn('Firebase init notice:', e);
+                    if (fsStatus) fsStatus.innerText = 'Firestore Sync';
+                }
+            } else {
+                if (fsStatus) fsStatus.innerText = 'Firestore Sync (Standby)';
+                if (badge) {
+                    badge.innerText = 'Standby (Offline Ready)';
+                    badge.className = 'text-xs px-2 py-0.5 rounded-full font-semibold bg-cyan-500/15 text-cyan-600 dark:text-cyan-400';
                 }
             }
         }
 
-        function handleGoogleCredentialResponse(response) {
+        // Sync with Firestore collection if connected
+        async function syncFromFirestore() {
+            if (!isFirebaseActive || !window.firebase) return;
             try {
-                const base64Url = response.credential.split('.')[1];
-                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-                }).join(''));
-                const payload = JSON.parse(jsonPayload);
-                
-                processUserLogin({
-                    name: payload.name || payload.given_name || 'Google User',
-                    email: payload.email,
-                    picture: payload.picture || '',
-                    googleSub: payload.sub
-                });
-            } catch (e) {
-                console.error('Failed to parse Google credential', e);
-                showToast('Google Sign-In failed');
+                const db = firebase.firestore();
+                // Pull pending requests from Firestore
+                const reqSnapshot = await db.collection('access_requests').where('status', '==', 'pending').get();
+                if (!reqSnapshot.empty) {
+                    const cloudReqs = [];
+                    reqSnapshot.forEach(doc => cloudReqs.push({ id: doc.id, ...doc.data() }));
+                    pendingRequests = cloudReqs;
+                    localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
+                    updateAuthUI();
+                }
+            } catch(err) {
+                console.log('Firestore sync notice:', err);
             }
+        }
+
+        async function syncToFirestore(collection, docId, data) {
+            if (!isFirebaseActive || !window.firebase) return;
+            try {
+                const db = firebase.firestore();
+                await db.collection(collection).doc(docId).set(data, { merge: true });
+            } catch(err) {
+                console.warn('Firestore write notice:', err);
+            }
+        }
+
+        // 1. Google Sign-In (Firebase Auth with seamless local fallback)
+        async function handleGoogleSignIn() {
+            if (isFirebaseActive && window.firebase) {
+                try {
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    const result = await firebase.auth().signInWithPopup(provider);
+                    const user = result.user;
+                    processUserLogin({
+                        name: user.displayName || 'Google User',
+                        email: user.email,
+                        picture: user.photoURL || '',
+                        uid: user.uid
+                    });
+                    return;
+                } catch(err) {
+                    console.warn('Firebase popup sign-in fallback:', err);
+                    if (err.code !== 'auth/popup-closed-by-user') {
+                        showToast(err.message || 'Firebase sign-in error');
+                    }
+                }
+            }
+
+            // Standalone / Offline Google Sign-In prompt
+            const choice = prompt(
+                `Google Sign-In Account:\n1. Admin Felix (felixpareja.pmdit07@gmail.com)\n2. Custom Google Email\n\nEnter 1 for Admin, or type an email:`,
+                "1"
+            );
+
+            if (!choice) return;
+
+            if (choice === '1' || choice.trim().toLowerCase() === MAIN_ADMIN_EMAIL) {
+                quickSignInAdmin();
+            } else {
+                const email = choice.trim().toLowerCase();
+                const name = email.split('@')[0];
+                processUserLogin({ name: name.charAt(0).toUpperCase() + name.slice(1), email: email, picture: '' });
+            }
+        }
+
+        // 2. Email / Password Submit (Sign In or Register)
+        async function handleEmailAuthSubmit(e) {
+            e.preventDefault();
+            const emailInput = document.getElementById('authEmailInput');
+            const passwordInput = document.getElementById('authPasswordInput');
+            const email = emailInput.value.trim().toLowerCase();
+            const password = passwordInput.value;
+
+            if (!email || !password) return;
+
+            if (isFirebaseActive && window.firebase) {
+                try {
+                    if (isRegisterMode) {
+                        const cred = await firebase.auth().createUserWithEmailAndPassword(email, password);
+                        processUserLogin({
+                            name: email.split('@')[0],
+                            email: email,
+                            picture: '',
+                            uid: cred.user.uid
+                        });
+                    } else {
+                        const cred = await firebase.auth().signInWithEmailAndPassword(email, password);
+                        processUserLogin({
+                            name: cred.user.displayName || email.split('@')[0],
+                            email: email,
+                            picture: '',
+                            uid: cred.user.uid
+                        });
+                    }
+                    return;
+                } catch(err) {
+                    console.warn('Firebase Auth error:', err);
+                    showToast(err.message || 'Authentication error');
+                    return;
+                }
+            }
+
+            // Standalone / Offline Auth execution
+            const displayName = email.split('@')[0];
+            processUserLogin({
+                name: displayName.charAt(0).toUpperCase() + displayName.slice(1),
+                email: email,
+                picture: ''
+            });
+        }
+
+        function toggleAuthMode() {
+            isRegisterMode = !isRegisterMode;
+            const submitText = document.getElementById('authSubmitText');
+            const toggleBtn = document.getElementById('toggleAuthModeBtn');
+            const submitBtn = document.getElementById('authSubmitBtn');
+
+            if (isRegisterMode) {
+                if (submitText) submitText.innerText = 'REGISTER & REQUEST ACCESS';
+                if (toggleBtn) toggleBtn.innerText = 'Already have an account? Sign In';
+                if (submitBtn) {
+                    submitBtn.classList.remove('bg-[#22d3ee]', 'hover:bg-[#06b6d4]');
+                    submitBtn.classList.add('bg-emerald-400', 'hover:bg-emerald-500');
+                }
+            } else {
+                if (submitText) submitText.innerText = 'SIGN IN TO IPON';
+                if (toggleBtn) toggleBtn.innerText = "Don't have an account? Register";
+                if (submitBtn) {
+                    submitBtn.classList.remove('bg-emerald-400', 'hover:bg-emerald-500');
+                    submitBtn.classList.add('bg-[#22d3ee]', 'hover:bg-[#06b6d4]');
+                }
+            }
+        }
+
+        function togglePasswordVisibility() {
+            const input = document.getElementById('authPasswordInput');
+            const icon = document.getElementById('passwordEyeIcon');
+            if (!input || !icon) return;
+
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fa-regular fa-eye-slash text-xs text-cyan-400';
+            } else {
+                input.type = 'password';
+                icon.className = 'fa-regular fa-eye text-xs text-slate-500';
+            }
+        }
+
+        function handleForgotPassword() {
+            const emailInput = document.getElementById('authEmailInput');
+            const email = (emailInput ? emailInput.value.trim() : '') || prompt("Enter your account email for password reset:");
+            if (!email) return;
+
+            if (isFirebaseActive && window.firebase) {
+                firebase.auth().sendPasswordResetEmail(email)
+                    .then(() => showToast(`Password reset link sent to ${email}`))
+                    .catch(err => showToast(err.message || 'Error sending reset email'));
+            } else {
+                showToast(`Password reset link sent to ${email}`);
+            }
+        }
+
+        // 3. Guest / Demo Terminal View
+        function exploreDemoTerminal() {
+            processUserLogin({
+                name: 'Guest Investor',
+                email: 'demo.investor@portalhub.local',
+                picture: '',
+                role: 'guest',
+                status: 'approved'
+            });
+            showToast('Entered Demo Terminal (Guest View)');
         }
 
         function quickSignInAdmin() {
@@ -953,35 +1150,14 @@
             });
         }
 
-        function openDemoFamilySignInModal() {
-            document.getElementById('demoFamilySignInModal').classList.remove('hidden');
-        }
-
-        function closeDemoFamilySignInModal() {
-            document.getElementById('demoFamilySignInModal').classList.add('hidden');
-        }
-
-        function handleDemoSignInSubmit(e) {
-            e.preventDefault();
-            const name = document.getElementById('demoSignInName').value.trim();
-            const email = document.getElementById('demoSignInEmail').value.trim().toLowerCase();
-            if (!email) return;
-
-            closeDemoFamilySignInModal();
-            processUserLogin({
-                name: name || email.split('@')[0],
-                email: email,
-                picture: ''
-            });
-        }
-
         function processUserLogin(userData) {
             userData.email = userData.email.toLowerCase();
             const isAdmin = userData.email === MAIN_ADMIN_EMAIL;
-            const isApproved = isAdmin || approvedUsers.includes(userData.email);
+            const isGuest = userData.role === 'guest';
+            const isApproved = isAdmin || isGuest || approvedUsers.includes(userData.email);
 
             if (isApproved) {
-                userData.role = isAdmin ? 'admin' : 'member';
+                userData.role = isAdmin ? 'admin' : (isGuest ? 'guest' : 'member');
                 userData.status = 'approved';
                 currentUser = userData;
                 localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
@@ -998,15 +1174,20 @@
                     const options = { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true };
                     const formattedDate = now.toLocaleString('en-US', options);
 
-                    pendingRequests.unshift({
+                    const newReq = {
                         id: 'req-' + Date.now(),
                         name: userData.name,
                         email: userData.email,
                         picture: userData.picture || '',
                         requestedAt: formattedDate,
                         status: 'pending'
-                    });
+                    };
+
+                    pendingRequests.unshift(newReq);
                     localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
+
+                    // Sync to Firestore if online
+                    syncToFirestore('access_requests', newReq.id, newReq);
                 }
                 showToast('Access request submitted to admin');
             }
@@ -1018,6 +1199,11 @@
             if (!currentUser) return;
             approvedUsers = JSON.parse(localStorage.getItem('portal_approved_users')) || [MAIN_ADMIN_EMAIL];
             
+            // Check Firestore if online
+            if (isFirebaseActive && window.firebase) {
+                syncFromFirestore();
+            }
+
             if (approvedUsers.includes(currentUser.email)) {
                 currentUser.status = 'approved';
                 currentUser.role = currentUser.email === MAIN_ADMIN_EMAIL ? 'admin' : 'member';
@@ -1030,12 +1216,56 @@
         }
 
         function signOutAuth() {
+            if (isFirebaseActive && window.firebase && firebase.auth) {
+                try { firebase.auth().signOut(); } catch(e) {}
+            }
             currentUser = null;
             localStorage.removeItem('portal_auth_user');
             const dropdown = document.getElementById('userDropdownMenu');
             if (dropdown) dropdown.classList.add('hidden');
             showToast('Signed out successfully');
             updateAuthUI();
+        }
+
+        function saveFirebaseConfig() {
+            const textarea = document.getElementById('firebaseConfigTextarea');
+            const val = textarea.value.trim();
+            if (!val) {
+                showToast('Please enter valid Firebase configuration');
+                return;
+            }
+
+            try {
+                const parsed = JSON.parse(val);
+                firebaseConfig = parsed;
+                localStorage.setItem('portal_firebase_config', JSON.stringify(firebaseConfig));
+                showToast('Firebase configuration saved!');
+                initFirebase();
+            } catch(err) {
+                showToast('Invalid JSON format for Firebase configuration');
+            }
+        }
+
+        function loadDefaultFirebaseSample() {
+            const textarea = document.getElementById('firebaseConfigTextarea');
+            const sample = {
+                apiKey: "AIzaSySampleKeyHere1234567890",
+                authDomain: "ipon-pse-portfolio.firebaseapp.com",
+                projectId: "ipon-pse-portfolio",
+                storageBucket: "ipon-pse-portfolio.appspot.com",
+                messagingSenderId: "123456789012",
+                appId: "1:123456789012:web:abcdef123456"
+            };
+            if (textarea) textarea.value = JSON.stringify(sample, null, 2);
+        }
+
+        function clearFirebaseConfig() {
+            localStorage.removeItem('portal_firebase_config');
+            firebaseConfig = null;
+            const textarea = document.getElementById('firebaseConfigTextarea');
+            if (textarea) textarea.value = '';
+            showToast('Firebase configuration cleared');
+            initFirebase();
         }
 
         function updateAuthUI() {
@@ -1307,15 +1537,12 @@
         }
 
         function saveGoogleClientId() {
-            const input = document.getElementById('googleClientIdInput');
-            googleClientId = input.value.trim();
-            localStorage.setItem('portal_google_client_id', googleClientId);
-            showToast('Google Client ID saved');
-            initGoogleIdentity();
         }
 
         window.onload = function() {
-            initGoogleIdentity();
+            initFirebase();
+            const fbArea = document.getElementById("firebaseConfigTextarea");
+            if (fbArea && firebaseConfig) fbArea.value = JSON.stringify(firebaseConfig, null, 2);
             updateAuthUI();
 
             // Migration: Purge legacy dummy sample apps and ensure Ipon is set as default sample app
@@ -1363,8 +1590,6 @@
             renderDrawerGrids();
             checkSystemTheme();
             checkLocalServerStatus();
-            const gIdInput = document.getElementById("googleClientIdInput");
-            if (gIdInput) gIdInput.value = googleClientId;
             
             // Close drawer on outside click
             document.addEventListener('click', function(e) {

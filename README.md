@@ -63,4 +63,9 @@ Portal/
 ## Authentication & Security
 
 - **Primary Admin**: `felixpareja.pmdit07@gmail.com`
-- **Client ID Setup**: You can enter your custom Google OAuth 2.0 Client ID in the Settings modal to enable production Google Identity Services sign-in on your custom domains.
+- **Continue with Google**: Powered by Google & Firebase Auth with one-click access.
+- **Firebase & Firestore Ready**:
+  - Pre-configured with Firebase 10.x SDKs (`firebase-app`, `firebase-auth`, and `firebase-firestore`).
+  - Supports pasting your Firebase project credentials in Settings for real-time cloud authentication and multi-device access request synchronization.
+  - Zero-setup offline fallback ensures full local operation without required cloud keys.
+
