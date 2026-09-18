@@ -426,9 +426,9 @@
                         <span class="font-bold tracking-wide">Awaiting Admin Approval</span>
                     </div>
                     <p class="text-xs text-slate-300 leading-relaxed">
-                        Your access request has been sent to the portfolio admin 
+                        Your access request has been sent to the portal admin 
                         (<span class="text-cyan-400 font-mono font-medium">felixpareja.pmdit07@gmail.com</span>). 
-                        Once approved, sign in again to access your portfolio.
+                        Once approved, sign in again to access PortalHub.
                     </p>
                 </div>
 
@@ -445,8 +445,8 @@
                     </button>
                 </div>
 
-                <!-- Subtext Footer matching Reference Image 1 -->
-                <p class="text-[11px] text-slate-500 font-mono mt-8">iPon PSE Portfolio Terminal • Access-Gated</p>
+                <!-- Subtext Footer -->
+                <p class="text-[11px] text-slate-500 font-mono mt-8">PortalHub • Access-Gated</p>
             </div>
         </div>
 
@@ -454,6 +454,28 @@
         <!-- VIEW 1: Full Central Dashboard -->
         <div id="dashboardHomeView" class="flex-1 overflow-y-auto p-4 sm:p-8">
             <div class="max-w-6xl mx-auto space-y-8 pb-12">
+                
+                <!-- ADMIN ACTION REQUIRED BANNER: Visible only to Admin when pending requests exist -->
+                <div id="adminPendingAlertBanner" class="hidden p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-amber-500/20 via-amber-500/15 to-orange-500/20 border-2 border-amber-500/40 text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl shadow-amber-500/10 animate-in fade-in slide-in-from-top-3">
+                    <div class="flex items-start sm:items-center space-x-3.5">
+                        <div class="w-11 h-11 rounded-2xl bg-amber-500/25 border border-amber-500/50 flex items-center justify-center text-amber-400 flex-shrink-0 animate-pulse">
+                            <i class="fa-solid fa-bell text-xl"></i>
+                        </div>
+                        <div>
+                            <div class="font-extrabold text-sm sm:text-base text-white flex items-center space-x-2">
+                                <span>Access Requests Awaiting Your Approval</span>
+                                <span id="adminPendingBannerCount" class="px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-xs">1</span>
+                            </div>
+                            <p id="adminPendingBannerDetail" class="text-xs text-amber-200/90 mt-0.5 leading-relaxed">
+                                Users have requested access to PortalHub.
+                            </p>
+                        </div>
+                    </div>
+                    <button onclick="openAccessRequestsModal()" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-lg shadow-amber-500/30 transition-all flex items-center justify-center space-x-2 flex-shrink-0">
+                        <i class="fa-solid fa-user-check text-xs"></i>
+                        <span>Review & Approve Requests</span>
+                    </button>
+                </div>
                 
                 <!-- Welcome Hero Banner (Compact) -->
                 <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 rounded-2xl sm:rounded-3xl p-5 sm:py-6 sm:px-8 text-white shadow-lg relative overflow-hidden flex flex-col justify-center">
@@ -994,27 +1016,59 @@
             }
         }
 
-        // Sync with Firestore collection if connected
-        async function syncFromFirestore() {
-            if (!isFirebaseActive || !window.firebase) return;
+        let firestoreReqUnsubscribe = null;
+        let firestoreUsersUnsubscribe = null;
+
+        // Sync with Firestore collection in real-time
+        function syncFromFirestore() {
+            if (!isFirebaseActive || !window.firebase || !firebase.firestore) return;
             try {
                 const db = firebase.firestore();
-                // Pull pending requests from Firestore
-                const reqSnapshot = await db.collection('access_requests').where('status', '==', 'pending').get();
-                if (!reqSnapshot.empty) {
-                    const cloudReqs = [];
-                    reqSnapshot.forEach(doc => cloudReqs.push({ id: doc.id, ...doc.data() }));
-                    pendingRequests = cloudReqs;
-                    localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
-                    updateAuthUI();
+                
+                // Real-time listener for pending access requests
+                if (!firestoreReqUnsubscribe) {
+                    firestoreReqUnsubscribe = db.collection('access_requests').onSnapshot(snapshot => {
+                        const cloudReqs = [];
+                        snapshot.forEach(doc => {
+                            const data = doc.data();
+                            if (data.status === 'pending') {
+                                cloudReqs.push({ id: doc.id, ...data });
+                            }
+                        });
+                        pendingRequests = cloudReqs;
+                        localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
+                        updateAuthUI();
+                        if (document.getElementById('accessRequestsModal') && !document.getElementById('accessRequestsModal').classList.contains('hidden')) {
+                            renderAccessRequestsList();
+                        }
+                    }, err => {
+                        console.log('Firestore access requests real-time sync notice:', err.message);
+                    });
+                }
+
+                // Real-time listener for approved users
+                if (!firestoreUsersUnsubscribe) {
+                    firestoreUsersUnsubscribe = db.collection('portal_settings').doc('access_control').onSnapshot(doc => {
+                        if (doc.exists) {
+                            const data = doc.data();
+                            if (Array.isArray(data.approvedUsers)) {
+                                approvedUsers = data.approvedUsers;
+                                if (!approvedUsers.includes(MAIN_ADMIN_EMAIL)) approvedUsers.unshift(MAIN_ADMIN_EMAIL);
+                                localStorage.setItem('portal_approved_users', JSON.stringify(approvedUsers));
+                                updateAuthUI();
+                            }
+                        }
+                    }, err => {
+                        console.log('Firestore access control real-time sync notice:', err.message);
+                    });
                 }
             } catch(err) {
-                console.log('Firestore sync notice:', err);
+                console.log('Firestore sync setup notice:', err);
             }
         }
 
         async function syncToFirestore(collection, docId, data) {
-            if (!isFirebaseActive || !window.firebase) return;
+            if (!isFirebaseActive || !window.firebase || !firebase.firestore) return;
             try {
                 const db = firebase.firestore();
                 await db.collection(collection).doc(docId).set(data, { merge: true });
@@ -1189,6 +1243,16 @@
                 currentUser = userData;
                 localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
                 showToast(isAdmin ? 'Welcome back, Admin Felix!' : `Welcome back, ${userData.name}!`);
+
+                // If Admin logs in and there are pending requests, automatically open the review modal!
+                if (isAdmin) {
+                    setTimeout(() => {
+                        const curPending = JSON.parse(localStorage.getItem('portal_access_requests')) || [];
+                        if (curPending.length > 0) {
+                            openAccessRequestsModal();
+                        }
+                    }, 500);
+                }
             } else {
                 userData.role = 'requester';
                 userData.status = 'pending';
@@ -1369,15 +1433,36 @@
                 if (isAdmin) {
                     navReqBtn.classList.remove('hidden');
                     navReqBtn.classList.add('flex');
+                    if (pendingCount > 0) {
+                        navReqBtn.classList.add('ring-2', 'ring-amber-400', 'animate-pulse');
+                    } else {
+                        navReqBtn.classList.remove('ring-2', 'ring-amber-400', 'animate-pulse');
+                    }
                 } else {
                     navReqBtn.classList.add('hidden');
-                    navReqBtn.classList.remove('flex');
+                    navReqBtn.classList.remove('flex', 'ring-2', 'ring-amber-400', 'animate-pulse');
                 }
             }
 
             if (menuReqLink) {
                 if (isAdmin) menuReqLink.classList.remove('hidden');
                 else menuReqLink.classList.add('hidden');
+            }
+
+            // Admin Pending Requests Alert Banner in Dashboard
+            const adminBanner = document.getElementById('adminPendingAlertBanner');
+            const bannerCount = document.getElementById('adminPendingBannerCount');
+            const bannerDetail = document.getElementById('adminPendingBannerDetail');
+
+            if (isAdmin && pendingCount > 0) {
+                if (adminBanner) adminBanner.classList.remove('hidden');
+                if (bannerCount) bannerCount.innerText = pendingCount;
+                if (bannerDetail) {
+                    const firstReq = pendingRequests[0];
+                    bannerDetail.innerHTML = `<span class="font-mono text-cyan-300 font-semibold">${firstReq.email}</span> ${pendingCount > 1 ? `and ${pendingCount - 1} other user(s)` : ''} requested access to PortalHub.`;
+                }
+            } else {
+                if (adminBanner) adminBanner.classList.add('hidden');
             }
         }
 
@@ -1480,7 +1565,7 @@
             }
         }
 
-        function approveAccessRequest(reqId) {
+        async function approveAccessRequest(reqId) {
             const req = pendingRequests.find(r => r.id === reqId);
             if (!req) return;
 
@@ -1492,24 +1577,41 @@
             pendingRequests = pendingRequests.filter(r => r.id !== reqId);
             localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
 
+            // Sync to Firestore if available
+            if (isFirebaseActive && window.firebase && firebase.firestore) {
+                try {
+                    const db = firebase.firestore();
+                    await db.collection('access_requests').doc(reqId).set({ status: 'approved' }, { merge: true });
+                    await db.collection('portal_settings').doc('access_control').set({ approvedUsers: approvedUsers }, { merge: true });
+                } catch(e) { console.warn('Firestore approve sync notice:', e); }
+            }
+
             showToast(`Approved access for ${req.name || req.email}`);
             renderAccessRequestsList();
             updateAuthUI();
         }
 
-        function declineAccessRequest(reqId) {
+        async function declineAccessRequest(reqId) {
             const req = pendingRequests.find(r => r.id === reqId);
             if (!req) return;
 
             pendingRequests = pendingRequests.filter(r => r.id !== reqId);
             localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
 
+            // Sync to Firestore if available
+            if (isFirebaseActive && window.firebase && firebase.firestore) {
+                try {
+                    const db = firebase.firestore();
+                    await db.collection('access_requests').doc(reqId).set({ status: 'declined' }, { merge: true });
+                } catch(e) { console.warn('Firestore decline sync notice:', e); }
+            }
+
             showToast(`Declined request for ${req.name || req.email}`);
             renderAccessRequestsList();
             updateAuthUI();
         }
 
-        function handlePreApproveSubmit(e) {
+        async function handlePreApproveSubmit(e) {
             e.preventDefault();
             const emailInput = document.getElementById('preApproveEmail');
             const nameInput = document.getElementById('preApproveName');
@@ -1530,6 +1632,14 @@
             pendingRequests = pendingRequests.filter(r => r.email !== email);
             localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
 
+            // Sync to Firestore if available
+            if (isFirebaseActive && window.firebase && firebase.firestore) {
+                try {
+                    const db = firebase.firestore();
+                    await db.collection('portal_settings').doc('access_control').set({ approvedUsers: approvedUsers }, { merge: true });
+                } catch(e) { console.warn('Firestore pre-approve sync notice:', e); }
+            }
+
             emailInput.value = '';
             nameInput.value = '';
             showToast(`Pre-approved ${name || email}!`);
@@ -1537,7 +1647,7 @@
             updateAuthUI();
         }
 
-        function revokeApprovedUser(email) {
+        async function revokeApprovedUser(email) {
             if (email === MAIN_ADMIN_EMAIL) return;
             if (!confirm(`Revoke portal access for ${email}?`)) return;
 
@@ -1548,6 +1658,14 @@
             if (currentUser && currentUser.email === email) {
                 currentUser.status = 'pending';
                 localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
+            }
+
+            // Sync to Firestore if available
+            if (isFirebaseActive && window.firebase && firebase.firestore) {
+                try {
+                    const db = firebase.firestore();
+                    await db.collection('portal_settings').doc('access_control').set({ approvedUsers: approvedUsers }, { merge: true });
+                } catch(e) { console.warn('Firestore revoke sync notice:', e); }
             }
 
             showToast(`Revoked access for ${email}`);
