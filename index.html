@@ -1001,6 +1001,19 @@
                         }
                     }).catch(err => console.log('Redirect result notice:', err));
 
+                    // If currently logged in as pending, ensure request exists in Firestore
+                    if (currentUser && currentUser.status === 'pending') {
+                        const docId = 'req-' + currentUser.email.replace(/[^a-zA-Z0-9]/g, '_');
+                        syncToFirestore('access_requests', docId, {
+                            id: docId,
+                            name: currentUser.name || currentUser.email.split('@')[0],
+                            email: currentUser.email,
+                            picture: currentUser.picture || '',
+                            requestedAt: new Date().toLocaleString('en-US'),
+                            status: 'pending'
+                        });
+                    }
+
                     // Sync access requests with Firestore collection
                     syncFromFirestore();
                 } catch(e) {
@@ -1035,7 +1048,22 @@
                                 cloudReqs.push({ id: doc.id, ...data });
                             }
                         });
-                        pendingRequests = cloudReqs;
+
+                        // Merge cloud with any local pending requests
+                        const localReqs = JSON.parse(localStorage.getItem('portal_access_requests')) || [];
+                        const mergedMap = new Map();
+                        cloudReqs.forEach(r => mergedMap.set(r.email, r));
+                        
+                        // If any local request is not in the cloud yet, push it to Firestore now!
+                        localReqs.forEach(lr => {
+                            if (!mergedMap.has(lr.email) && lr.status === 'pending') {
+                                mergedMap.set(lr.email, lr);
+                                const docId = lr.id || ('req-' + lr.email.replace(/[^a-zA-Z0-9]/g, '_'));
+                                db.collection('access_requests').doc(docId).set(lr, { merge: true }).catch(() => {});
+                            }
+                        });
+
+                        pendingRequests = Array.from(mergedMap.values());
                         localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
                         updateAuthUI();
                         if (document.getElementById('accessRequestsModal') && !document.getElementById('accessRequestsModal').classList.contains('hidden')) {
@@ -1379,14 +1407,16 @@
                 return;
             }
 
-            if (header) header.classList.remove('hidden');
-
             if (currentUser.status === 'pending') {
-                // Awaiting Admin Approval
+                // Awaiting Admin Approval: HIDE HEADER & MENU BAR COMPLETELY
                 if (signInView) signInView.classList.add('hidden');
                 if (pendingView) pendingView.classList.remove('hidden');
                 if (dashboardView) dashboardView.classList.add('hidden');
                 if (activeAppView) activeAppView.classList.add('hidden');
+                if (header) header.classList.add('hidden');
+
+                const userMenu = document.getElementById('userDropdownMenu');
+                if (userMenu) userMenu.classList.add('hidden');
 
                 const emailDisp = document.getElementById('pendingUserEmailDisplay');
                 if (emailDisp) emailDisp.innerText = currentUser.email;
@@ -1398,7 +1428,8 @@
                 return;
             }
 
-            // User is approved!
+            // User is approved: show header and dashboard
+            if (header) header.classList.remove('hidden');
             if (signInView) signInView.classList.add('hidden');
             if (pendingView) pendingView.classList.add('hidden');
             if (!currentActiveApp) {
