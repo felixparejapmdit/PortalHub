@@ -1320,21 +1320,15 @@
                         }
                     }).catch(err => console.log('Redirect result notice:', err));
 
-                    // If currently logged in as pending, ensure request exists in Firestore (unless declined)
-                    if (currentUser && currentUser.status === 'pending') {
-                        const rawDeclined = localStorage.getItem('portal_declined_users');
-                        const declinedUsers = JSON.parse(rawDeclined) || [];
+                    // If logged in user in localStorage is not an approved member: auto-logout immediately
+                    if (currentUser && !isCurrentUserAdmin() && currentUser.role !== 'guest') {
                         const userEm = (currentUser.email || '').toLowerCase().trim();
-                        if (!declinedUsers.some(u => u.toLowerCase() === userEm)) {
-                            const docId = 'req-' + userEm.replace(/[^a-zA-Z0-9]/g, '_');
-                            syncToFirestore('access_requests', docId, {
-                                id: docId,
-                                name: currentUser.name || currentUser.email.split('@')[0],
-                                email: currentUser.email,
-                                picture: currentUser.picture || '',
-                                requestedAt: new Date().toLocaleString('en-US'),
-                                status: 'pending'
-                            });
+                        if (!approvedUsers.some(u => (u || '').toLowerCase().trim() === userEm)) {
+                            currentUser = null;
+                            localStorage.removeItem('portal_auth_user');
+                            if (window.firebase && firebase.auth) {
+                                try { firebase.auth().signOut(); } catch(e) {}
+                            }
                         }
                     }
 
@@ -1366,25 +1360,18 @@
                 if (!firestoreReqUnsubscribe) {
                     firestoreReqUnsubscribe = db.collection('access_requests').onSnapshot(snapshot => {
                         const currentApproved = JSON.parse(localStorage.getItem('portal_approved_users')) || [MAIN_ADMIN_EMAIL];
-                        const currentDeclined = JSON.parse(localStorage.getItem('portal_declined_users')) || [];
                         const cloudReqs = [];
                         snapshot.forEach(doc => {
                             const data = doc.data();
                             const em = (data.email || '').toLowerCase().trim();
-                            
-                            // If this email is declined, purge it from Firestore
-                            if (em && currentDeclined.some(u => u.toLowerCase() === em)) {
-                                doc.ref.delete().catch(() => {});
-                                return;
-                            }
 
-                            // Only include if status is pending AND email is NOT approved and NOT declined
-                            if (data.status === 'pending' && em && !currentApproved.some(u => u.toLowerCase() === em) && !currentDeclined.some(u => u.toLowerCase() === em)) {
+                            // Only include if status is pending AND email is NOT in approvedUsers
+                            if (data.status === 'pending' && em && !currentApproved.some(u => (u || '').toLowerCase().trim() === em)) {
                                 cloudReqs.push({ id: doc.id, ...data, email: em });
                             }
                         });
 
-                        // Keep requests that are strictly pending, not approved, and not declined
+                        // Keep unique requests that are strictly pending and not approved
                         const mergedMap = new Map();
                         cloudReqs.forEach(r => mergedMap.set(r.email, r));
 
@@ -1399,14 +1386,11 @@
                     });
                 }
 
-                // Real-time listener for approved & declined users
+                // Real-time listener for approved users
                 if (!firestoreUsersUnsubscribe) {
                     firestoreUsersUnsubscribe = db.collection('portal_settings').doc('access_control').onSnapshot(doc => {
                         if (doc.exists) {
                             const data = doc.data();
-                            if (Array.isArray(data.declinedUsers)) {
-                                localStorage.setItem('portal_declined_users', JSON.stringify(data.declinedUsers));
-                            }
                             if (Array.isArray(data.approvedUsers)) {
                                 approvedUsers = data.approvedUsers;
                                 if (!approvedUsers.some(u => u.toLowerCase() === MAIN_ADMIN_EMAIL.toLowerCase())) {
@@ -1414,27 +1398,23 @@
                                 }
                                 localStorage.setItem('portal_approved_users', JSON.stringify(approvedUsers));
 
-                                const currentDeclined = JSON.parse(localStorage.getItem('portal_declined_users')) || [];
-
-                                // Remove any pending requests that are now in approvedUsers or declinedUsers
+                                // Remove any pending requests that are now in approvedUsers
                                 pendingRequests = (JSON.parse(localStorage.getItem('portal_access_requests')) || []).filter(r => 
                                     r && r.status === 'pending' && 
-                                    !approvedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase()) &&
-                                    !currentDeclined.some(u => u.toLowerCase() === (r.email || '').toLowerCase())
+                                    !approvedUsers.some(u => (u || '').toLowerCase().trim() === (r.email || '').toLowerCase().trim())
                                 );
                                 localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
 
-                                // If this client is pending and now approved: AUTO-ENTER PortalHub!
-                                if (currentUser && currentUser.status === 'pending') {
-                                    const myEmail = (currentUser.email || '').toLowerCase();
-                                    if (approvedUsers.some(u => u.toLowerCase() === myEmail)) {
-                                        currentUser.status = 'approved';
-                                        currentUser.role = myEmail === MAIN_ADMIN_EMAIL.toLowerCase() ? 'admin' : 'member';
-                                        localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
-                                        showToast('Access Approved by Admin! Entering PortalHub...');
-                                    } else if (currentDeclined.some(u => u.toLowerCase() === myEmail)) {
-                                        currentUser.status = 'declined';
-                                        localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
+                                // Automatically logout any logged in user who is not in approvedUsers
+                                if (currentUser && !isCurrentUserAdmin() && currentUser.role !== 'guest') {
+                                    const myEmail = (currentUser.email || '').toLowerCase().trim();
+                                    if (!approvedUsers.some(u => (u || '').toLowerCase().trim() === myEmail)) {
+                                        currentUser = null;
+                                        localStorage.removeItem('portal_auth_user');
+                                        if (window.firebase && firebase.auth) {
+                                            try { firebase.auth().signOut(); } catch(e) {}
+                                        }
+                                        showToast('Access not approved. Automatically logged out.');
                                     }
                                 }
 
@@ -1517,54 +1497,40 @@
                 }
                 approvedUsers = localApproved;
 
-                const rawDeclined = localStorage.getItem('portal_declined_users');
-                const declinedUsers = JSON.parse(rawDeclined) || [];
-
-                const rawRequests = localStorage.getItem('portal_access_requests');
-                let localReqs = (JSON.parse(rawRequests) || []).filter(r => 
-                    r && r.status === 'pending' && 
-                    !approvedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase()) &&
-                    !declinedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase())
-                );
-
-                // If user is pending, check if newly approved or declined
-                if (currentUser && currentUser.status === 'pending') {
-                    const userEmail = (currentUser.email || '').toLowerCase();
-                    if (approvedUsers.some(u => u.toLowerCase() === userEmail)) {
-                        currentUser.status = 'approved';
-                        currentUser.role = userEmail === MAIN_ADMIN_EMAIL.toLowerCase() ? 'admin' : 'member';
-                        localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
-                        showToast('Access Approved by Admin! Entering PortalHub...');
-                        updateAuthUI();
-                        return;
-                    }
-                    if (declinedUsers.some(u => u.toLowerCase() === userEmail)) {
-                        currentUser.status = 'declined';
-                        localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
+                // If non-admin logged in user is no longer in approvedUsers: auto-logout immediately!
+                if (currentUser && !isCurrentUserAdmin() && currentUser.role !== 'guest') {
+                    const myEmail = (currentUser.email || '').toLowerCase().trim();
+                    if (!approvedUsers.some(u => (u || '').toLowerCase().trim() === myEmail)) {
+                        currentUser = null;
+                        localStorage.removeItem('portal_auth_user');
+                        if (window.firebase && firebase.auth) {
+                            try { firebase.auth().signOut(); } catch(e) {}
+                        }
+                        showToast('Access not approved. Automatically logged out.');
                         updateAuthUI();
                         return;
                     }
                 }
 
+                const rawRequests = localStorage.getItem('portal_access_requests');
+                let localReqs = (JSON.parse(rawRequests) || []).filter(r => 
+                    r && r.status === 'pending' && 
+                    !approvedUsers.some(u => (u || '').toLowerCase().trim() === (r.email || '').toLowerCase().trim())
+                );
+
                 // If Firebase is active and user is admin: poll Firestore directly to catch requests from other devices/browsers
-                const isAdmin = currentUser && currentUser.email && currentUser.email.toLowerCase() === MAIN_ADMIN_EMAIL.toLowerCase();
+                const isAdmin = isCurrentUserAdmin();
                 if (isFirebaseActive && window.firebase && firebase.firestore && isAdmin) {
                     try {
                         const db = firebase.firestore();
-                        const snapshot = await db.collection('access_requests').where('status', '==', 'pending').get();
+                        const snapshot = await db.collection('access_requests').get();
                         let hasChanges = false;
                         snapshot.forEach(doc => {
                             const r = doc.data();
                             const em = (r.email || '').toLowerCase().trim();
-                            
-                            // If this email was declined, delete rogue document from Firestore!
-                            if (declinedUsers.some(u => u.toLowerCase() === em)) {
-                                doc.ref.delete().catch(() => {});
-                                return;
-                            }
 
-                            if (em && !approvedUsers.some(u => u.toLowerCase() === em) && !declinedUsers.some(u => u.toLowerCase() === em)) {
-                                if (!localReqs.some(lr => (lr.email || '').toLowerCase() === em)) {
+                            if (r && r.status === 'pending' && em && !approvedUsers.some(u => (u || '').toLowerCase().trim() === em)) {
+                                if (!localReqs.some(lr => (lr.email || '').toLowerCase().trim() === em)) {
                                     localReqs.unshift({ id: doc.id, ...r, email: em });
                                     hasChanges = true;
                                 }
@@ -1743,16 +1709,17 @@
             });
         }
 
-        function processUserLogin(userData) {
+        async function processUserLogin(userData) {
             userData.email = (userData.email || '').toLowerCase().trim();
             const isAdmin = userData.email === MAIN_ADMIN_EMAIL.toLowerCase();
             const isGuest = userData.role === 'guest';
             
-            const rawDeclined = localStorage.getItem('portal_declined_users');
-            const declinedUsers = JSON.parse(rawDeclined) || [];
-            const isDeclined = declinedUsers.some(u => u.toLowerCase() === userData.email);
+            approvedUsers = JSON.parse(localStorage.getItem('portal_approved_users')) || [MAIN_ADMIN_EMAIL];
+            if (!approvedUsers.some(u => u.toLowerCase() === MAIN_ADMIN_EMAIL.toLowerCase())) {
+                approvedUsers.unshift(MAIN_ADMIN_EMAIL);
+            }
 
-            const isApproved = isAdmin || isGuest || approvedUsers.some(u => u.toLowerCase() === userData.email);
+            const isApproved = isAdmin || isGuest || approvedUsers.some(u => (u || '').toLowerCase().trim() === userData.email);
 
             if (isApproved) {
                 userData.role = isAdmin ? 'admin' : (isGuest ? 'guest' : 'member');
@@ -1761,7 +1728,6 @@
                 localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
                 showToast(isAdmin ? 'Welcome back, Admin Felix!' : `Welcome back, ${userData.name}!`);
 
-                // If Admin logs in and there are pending requests, automatically open the review modal!
                 if (isAdmin) {
                     setTimeout(() => {
                         const curPending = JSON.parse(localStorage.getItem('portal_access_requests')) || [];
@@ -1770,45 +1736,68 @@
                         }
                     }, 500);
                 }
-            } else if (isDeclined) {
-                userData.role = 'declined';
-                userData.status = 'declined';
-                currentUser = userData;
-                localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
-                showToast('Your access request was declined by the administrator');
+                updateAuthUI();
+                notifyAccessRequestsChanged();
             } else {
-                userData.role = 'requester';
-                userData.status = 'pending';
-                currentUser = userData;
-                localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
+                // NOT AN APPROVED MEMBER:
+                // 1. Clear any prior decline record so new request is active and visible
+                let rawDeclined = localStorage.getItem('portal_declined_users');
+                let declinedList = JSON.parse(rawDeclined) || [];
+                declinedList = declinedList.filter(u => (u || '').toLowerCase().trim() !== userData.email);
+                localStorage.setItem('portal_declined_users', JSON.stringify(declinedList));
 
-                // Add to pending access requests if not already present
-                if (!pendingRequests.some(r => (r.email || '').toLowerCase().trim() === userData.email)) {
-                    const now = new Date();
-                    const options = { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true };
-                    const formattedDate = now.toLocaleString('en-US', options);
+                // 2. Submit/refresh access request in Firestore
+                const cleanDocId = 'req-' + userData.email.replace(/[^a-zA-Z0-9]/g, '_');
+                const now = new Date();
+                const options = { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true };
+                const formattedDate = now.toLocaleString('en-US', options);
 
-                    const newReq = {
-                        id: 'req-' + Date.now(),
-                        name: userData.name,
-                        email: userData.email,
-                        picture: userData.picture || '',
-                        requestedAt: formattedDate,
-                        status: 'pending'
-                    };
+                const newReq = {
+                    id: cleanDocId,
+                    name: userData.name || userData.email.split('@')[0],
+                    email: userData.email,
+                    picture: userData.picture || '',
+                    requestedAt: formattedDate,
+                    status: 'pending'
+                };
 
-                    pendingRequests.unshift(newReq);
-                    localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
+                // Add to local pendingRequests
+                pendingRequests = (JSON.parse(localStorage.getItem('portal_access_requests')) || []).filter(r => (r.email || '').toLowerCase().trim() !== userData.email);
+                pendingRequests.unshift(newReq);
+                localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
 
-                    // Sync to Firestore if online
-                    syncToFirestore('access_requests', newReq.id, newReq);
-                    notifyAccessRequestsChanged();
+                // Always sync directly to Firestore access_requests collection so Admin receives the request
+                if (window.firebase) {
+                    try {
+                        const db = firebase.firestore();
+                        await db.collection('access_requests').doc(cleanDocId).set(newReq, { merge: true });
+                        console.log('Access request successfully synced to Firestore:', cleanDocId);
+
+                        // Clear from Firestore declinedUsers if present
+                        const accessDoc = await db.collection('portal_settings').doc('access_control').get();
+                        if (accessDoc.exists) {
+                            const data = accessDoc.data();
+                            if (Array.isArray(data.declinedUsers) && data.declinedUsers.some(u => (u || '').toLowerCase().trim() === userData.email)) {
+                                const updatedDeclined = data.declinedUsers.filter(u => (u || '').toLowerCase().trim() !== userData.email);
+                                await db.collection('portal_settings').doc('access_control').set({ declinedUsers: updatedDeclined }, { merge: true });
+                            }
+                        }
+                    } catch(e) {
+                        console.warn('Error saving access request to Firestore:', e);
+                    }
                 }
-                showToast('Access request submitted to admin');
-            }
 
-            updateAuthUI();
-            notifyAccessRequestsChanged();
+                // 3. AUTOMATICALLY LOGOUT: Non-approved members are never kept logged in
+                if (window.firebase && firebase.auth) {
+                    try { await firebase.auth().signOut(); } catch(e) {}
+                }
+                currentUser = null;
+                localStorage.removeItem('portal_auth_user');
+
+                showToast('Access request submitted to Admin! As you are not an approved member, you have been automatically logged out. Please wait for Admin approval.');
+                updateAuthUI();
+                notifyAccessRequestsChanged();
+            }
         }
 
         async function checkApprovalStatus() {
@@ -1919,14 +1908,10 @@
                 approvedUsers.unshift(MAIN_ADMIN_EMAIL);
             }
 
-            const rawDeclined = localStorage.getItem('portal_declined_users');
-            const declinedUsers = JSON.parse(rawDeclined) || [];
-
-            // STRICT FILTER: pendingRequests must be status 'pending' AND NOT in approvedUsers AND NOT in declinedUsers
+            // Filter pending requests strictly against approvedUsers
             pendingRequests = (JSON.parse(localStorage.getItem('portal_access_requests')) || []).filter(r => 
                 r && r.status === 'pending' && 
-                !approvedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase().trim()) &&
-                !declinedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase().trim())
+                !approvedUsers.some(u => (u || '').toLowerCase().trim() === (r.email || '').toLowerCase().trim())
             );
             localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
 
@@ -1944,24 +1929,26 @@
                 return;
             }
 
-            if (currentUser.status === 'pending' || currentUser.status === 'declined') {
-                // Awaiting Admin Approval or Declined: HIDE HEADER & MENU BAR COMPLETELY
-                if (signInView) signInView.classList.add('hidden');
-                if (pendingView) pendingView.classList.remove('hidden');
+            // AUTH CHECK: Ensure logged-in user is an approved member!
+            const userEmail = (currentUser.email || '').toLowerCase().trim();
+            const isAdmin = isCurrentUserAdmin();
+            const isGuest = currentUser.role === 'guest';
+            const isApproved = isAdmin || isGuest || approvedUsers.some(u => (u || '').toLowerCase().trim() === userEmail);
+
+            if (!isApproved) {
+                // User is not an approved member! AUTOMATICALLY LOGOUT as requested!
+                currentUser = null;
+                localStorage.removeItem('portal_auth_user');
+                if (window.firebase && firebase.auth) {
+                    try { firebase.auth().signOut(); } catch(e) {}
+                }
+                if (signInView) signInView.classList.remove('hidden');
+                if (pendingView) pendingView.classList.add('hidden');
                 if (dashboardView) dashboardView.classList.add('hidden');
                 if (activeAppView) activeAppView.classList.add('hidden');
                 if (header) header.classList.add('hidden');
-
                 const userMenu = document.getElementById('userDropdownMenu');
                 if (userMenu) userMenu.classList.add('hidden');
-
-                const emailDisp = document.getElementById('pendingUserEmailDisplay');
-                if (emailDisp) emailDisp.innerText = currentUser.email;
-
-                const letterDisp = document.getElementById('pendingAvatarLetter');
-                if (letterDisp) letterDisp.innerText = (currentUser.name || currentUser.email).charAt(0).toUpperCase();
-
-                if (navReqBtn) navReqBtn.classList.add('hidden');
                 return;
             }
 
@@ -1986,7 +1973,6 @@
             if (menuInitial) menuInitial.innerText = initial;
             if (menuName) menuName.innerText = currentUser.name || 'Portal User';
             if (menuEmail) menuEmail.innerText = currentUser.email;
-            const isAdmin = isCurrentUserAdmin();
             if (menuRole) {
                 menuRole.className = isAdmin 
                     ? 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 mb-2'
@@ -2071,6 +2057,9 @@
         function openAccessRequestsModal() {
             renderAccessRequestsList();
             document.getElementById('accessRequestsModal').classList.remove('hidden');
+            if (isFirebaseActive && window.firebase && firebase.firestore) {
+                refreshPendingRequestsState();
+            }
         }
 
         function closeAccessRequestsModal() {
@@ -2084,14 +2073,10 @@
                 approvedUsers.unshift(MAIN_ADMIN_EMAIL);
             }
 
-            const rawDeclined = localStorage.getItem('portal_declined_users');
-            const declinedUsers = JSON.parse(rawDeclined) || [];
-
-            // Exclude already approved users and declined users
+            // Exclude already approved users: all other pending requests MUST be visible to admin
             pendingRequests = (JSON.parse(localStorage.getItem('portal_access_requests')) || []).filter(r => 
                 r && r.status === 'pending' && 
-                !approvedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase().trim()) &&
-                !declinedUsers.some(u => u.toLowerCase() === (r.email || '').toLowerCase().trim())
+                !approvedUsers.some(u => (u || '').toLowerCase().trim() === (r.email || '').toLowerCase().trim())
             );
             localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
 
@@ -2205,15 +2190,15 @@
 
                     const cleanDocId = 'req-' + targetEmail.replace(/[^a-zA-Z0-9]/g, '_');
                     if (reqId) {
-                        db.collection('access_requests').doc(reqId).set({ status: 'approved' }, { merge: true }).catch(() => {});
+                        db.collection('access_requests').doc(reqId).delete().catch(() => {});
                     }
-                    db.collection('access_requests').doc(cleanDocId).set({ status: 'approved' }, { merge: true }).catch(() => {});
+                    db.collection('access_requests').doc(cleanDocId).delete().catch(() => {});
 
                     const allReqs = await db.collection('access_requests').get();
                     allReqs.forEach(doc => {
                         const data = doc.data();
                         if ((data.email || '').toLowerCase().trim() === targetEmail) {
-                            doc.ref.set({ status: 'approved' }, { merge: true }).catch(() => {});
+                            doc.ref.delete().catch(() => {});
                         }
                     });
                 } catch(e) { console.warn('Firestore approve sync notice:', e); }
@@ -2232,24 +2217,17 @@
                 return;
             }
 
-            // 1. Add to declinedUsers list in localStorage & remove from approvedUsers
-            let rawDeclined = localStorage.getItem('portal_declined_users');
-            let declinedUsers = JSON.parse(rawDeclined) || [];
-            if (!declinedUsers.some(u => u.toLowerCase() === targetEmail)) {
-                declinedUsers.push(targetEmail);
-            }
-            localStorage.setItem('portal_declined_users', JSON.stringify(declinedUsers));
-
-            approvedUsers = approvedUsers.filter(u => u.toLowerCase() !== targetEmail);
+            // Remove from approvedUsers if present
+            approvedUsers = approvedUsers.filter(u => (u || '').toLowerCase().trim() !== targetEmail);
             localStorage.setItem('portal_approved_users', JSON.stringify(approvedUsers));
 
-            // 2. Remove from pendingRequests immediately
+            // Remove from pendingRequests immediately
             pendingRequests = pendingRequests.filter(r => 
                 (r.email || '').toLowerCase().trim() !== targetEmail && r.id !== reqId
             );
             localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
 
-            // 3. Immediately update UI so the modal and dashboard reflect the removal instantly
+            // Immediately update UI so the modal and dashboard reflect the removal instantly
             renderAccessRequestsList();
             updateAuthUI();
             const adminBanner = document.getElementById('adminPendingAlertBanner');
@@ -2257,14 +2235,13 @@
             showToast(`Declined request for ${targetEmail}`);
             notifyAccessRequestsChanged();
 
-            // 4. Clean up Firestore in background
+            // Clean up Firestore in background: delete pending request docs
             if (isFirebaseActive && window.firebase && firebase.firestore) {
                 try {
                     const db = firebase.firestore();
                     
-                    // Update access_control with declinedUsers & updated approvedUsers
+                    // Update access_control with updated approvedUsers
                     await db.collection('portal_settings').doc('access_control').set({
-                        declinedUsers: declinedUsers,
                         approvedUsers: approvedUsers
                     }, { merge: true });
 
@@ -2329,13 +2306,17 @@
             if (email === MAIN_ADMIN_EMAIL) return;
             if (!confirm(`Revoke portal access for ${email}?`)) return;
 
-            approvedUsers = approvedUsers.filter(e => e !== email);
+            const targetEmail = (email || '').toLowerCase().trim();
+            approvedUsers = approvedUsers.filter(e => (e || '').toLowerCase().trim() !== targetEmail);
             localStorage.setItem('portal_approved_users', JSON.stringify(approvedUsers));
 
-            // If current user is the revoked user, kick back to pending
-            if (currentUser && currentUser.email === email) {
-                currentUser.status = 'pending';
-                localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
+            // If current user is the revoked user, automatically log out immediately
+            if (currentUser && (currentUser.email || '').toLowerCase().trim() === targetEmail) {
+                currentUser = null;
+                localStorage.removeItem('portal_auth_user');
+                if (window.firebase && firebase.auth) {
+                    try { firebase.auth().signOut(); } catch(e) {}
+                }
             }
 
             // Sync to Firestore if available
