@@ -69,3 +69,50 @@ Portal/
   - Supports pasting your Firebase project credentials in Settings for real-time cloud authentication and multi-device access request synchronization.
   - Zero-setup offline fallback ensures full local operation without required cloud keys.
 
+---
+
+## Deploy to Firebase Hosting
+
+PortalHub includes a ready-to-use [`firebase.json`](firebase.json) configured for fast single-page app hosting.
+
+### Step 1: Install Firebase CLI
+If you haven't installed `firebase-tools`, install it globally using npm:
+```bash
+npm install -g firebase-tools
+```
+
+### Step 2: Log In to Firebase
+Log in with the Google account that manages your Firebase project:
+```bash
+firebase login
+```
+
+### Step 3: Select or Initialize Your Project
+From inside the `Portal` folder:
+```bash
+# Option A: Connect to an existing project (e.g., your portfolio project)
+firebase use --add
+
+# Option B: Create a brand new Firebase project in the Firebase Console
+# https://console.firebase.google.com/
+```
+
+> **Note on Existing Sites**: If you use the existing `ipon-pse-portfolio` project, you can either:
+> 1. Deploy PortalHub as a secondary site using [Firebase Multisite](https://firebase.google.com/docs/hosting/multisite) (`firebase hosting:sites:create <subsite-name>`), OR
+> 2. Create a dedicated project like `portalhub-central` so your Ipon portfolio at `ipon-pse-portfolio.web.app` remains completely separate.
+
+### Step 4: Deploy
+Run the deploy command:
+```bash
+firebase deploy --only hosting
+```
+Once complete, Firebase will output your live URL:
+`https://<your-project-id>.web.app`
+
+### Step 5: Authorize Google Sign-In Domain
+To ensure Google Sign-In works on your live URL:
+1. Go to [Firebase Console](https://console.firebase.google.com/) -> Select your Project.
+2. Navigate to **Authentication** -> **Settings** tab -> **Authorized domains**.
+3. Confirm that your hosting domain (e.g. `your-app.web.app`) is listed in Authorized Domains.
+
+
