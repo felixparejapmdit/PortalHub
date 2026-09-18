@@ -4,10 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>PortalHub - Unified Service Gateway</title>
-    <!-- Apple Mobile Web App Meta Tags -->
+    <!-- Mobile Web App Meta Tags & No-Cache Directives -->
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="PortalHub">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <!-- App Icons & Manifest -->
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="icon" type="image/png" href="favicon.png">
@@ -1316,17 +1320,22 @@
                         }
                     }).catch(err => console.log('Redirect result notice:', err));
 
-                    // If currently logged in as pending, ensure request exists in Firestore
+                    // If currently logged in as pending, ensure request exists in Firestore (unless declined)
                     if (currentUser && currentUser.status === 'pending') {
-                        const docId = 'req-' + currentUser.email.replace(/[^a-zA-Z0-9]/g, '_');
-                        syncToFirestore('access_requests', docId, {
-                            id: docId,
-                            name: currentUser.name || currentUser.email.split('@')[0],
-                            email: currentUser.email,
-                            picture: currentUser.picture || '',
-                            requestedAt: new Date().toLocaleString('en-US'),
-                            status: 'pending'
-                        });
+                        const rawDeclined = localStorage.getItem('portal_declined_users');
+                        const declinedUsers = JSON.parse(rawDeclined) || [];
+                        const userEm = (currentUser.email || '').toLowerCase().trim();
+                        if (!declinedUsers.some(u => u.toLowerCase() === userEm)) {
+                            const docId = 'req-' + userEm.replace(/[^a-zA-Z0-9]/g, '_');
+                            syncToFirestore('access_requests', docId, {
+                                id: docId,
+                                name: currentUser.name || currentUser.email.split('@')[0],
+                                email: currentUser.email,
+                                picture: currentUser.picture || '',
+                                requestedAt: new Date().toLocaleString('en-US'),
+                                status: 'pending'
+                            });
+                        }
                     }
 
                     // Sync access requests with Firestore collection
@@ -1609,6 +1618,10 @@
                     const provider = new firebase.auth.GoogleAuthProvider();
                     provider.setCustomParameters({ prompt: 'select_account' });
                     firebase.auth().signInWithRedirect(provider);
+                } else if (err.code === 'auth/unauthorized-domain') {
+                    const domain = window.location.hostname;
+                    showToast(`Domain "${domain}" is not authorized in Firebase Console.`);
+                    alert(`Firebase Authentication Notice:\n\nThe domain "${domain}" is not yet in your Firebase authorized domains list.\n\nTo allow Google Sign-In here:\n1. Open Firebase Console (https://console.firebase.google.com/project/portalhub-f3221/authentication/settings)\n2. Navigate to "Settings" -> "Authorized domains"\n3. Click "Add domain" and add "${domain}"\n4. Refresh this page to sign in!`);
                 } else {
                     showToast(err.message || 'Google Sign-In failed');
                 }
@@ -1731,10 +1744,15 @@
         }
 
         function processUserLogin(userData) {
-            userData.email = userData.email.toLowerCase();
-            const isAdmin = userData.email === MAIN_ADMIN_EMAIL;
+            userData.email = (userData.email || '').toLowerCase().trim();
+            const isAdmin = userData.email === MAIN_ADMIN_EMAIL.toLowerCase();
             const isGuest = userData.role === 'guest';
-            const isApproved = isAdmin || isGuest || approvedUsers.includes(userData.email);
+            
+            const rawDeclined = localStorage.getItem('portal_declined_users');
+            const declinedUsers = JSON.parse(rawDeclined) || [];
+            const isDeclined = declinedUsers.some(u => u.toLowerCase() === userData.email);
+
+            const isApproved = isAdmin || isGuest || approvedUsers.some(u => u.toLowerCase() === userData.email);
 
             if (isApproved) {
                 userData.role = isAdmin ? 'admin' : (isGuest ? 'guest' : 'member');
@@ -1752,6 +1770,12 @@
                         }
                     }, 500);
                 }
+            } else if (isDeclined) {
+                userData.role = 'declined';
+                userData.status = 'declined';
+                currentUser = userData;
+                localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
+                showToast('Your access request was declined by the administrator');
             } else {
                 userData.role = 'requester';
                 userData.status = 'pending';
@@ -1759,7 +1783,7 @@
                 localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
 
                 // Add to pending access requests if not already present
-                if (!pendingRequests.some(r => r.email === userData.email)) {
+                if (!pendingRequests.some(r => (r.email || '').toLowerCase().trim() === userData.email)) {
                     const now = new Date();
                     const options = { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true };
                     const formattedDate = now.toLocaleString('en-US', options);
@@ -2208,7 +2232,7 @@
                 return;
             }
 
-            // 1. Add to declinedUsers list in localStorage
+            // 1. Add to declinedUsers list in localStorage & remove from approvedUsers
             let rawDeclined = localStorage.getItem('portal_declined_users');
             let declinedUsers = JSON.parse(rawDeclined) || [];
             if (!declinedUsers.some(u => u.toLowerCase() === targetEmail)) {
@@ -2216,15 +2240,20 @@
             }
             localStorage.setItem('portal_declined_users', JSON.stringify(declinedUsers));
 
+            approvedUsers = approvedUsers.filter(u => u.toLowerCase() !== targetEmail);
+            localStorage.setItem('portal_approved_users', JSON.stringify(approvedUsers));
+
             // 2. Remove from pendingRequests immediately
             pendingRequests = pendingRequests.filter(r => 
                 (r.email || '').toLowerCase().trim() !== targetEmail && r.id !== reqId
             );
             localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
 
-            // 3. Immediately update UI so the modal reflects the removal instantly
+            // 3. Immediately update UI so the modal and dashboard reflect the removal instantly
             renderAccessRequestsList();
             updateAuthUI();
+            const adminBanner = document.getElementById('adminPendingAlertBanner');
+            if (adminBanner && pendingRequests.length === 0) adminBanner.classList.add('hidden');
             showToast(`Declined request for ${targetEmail}`);
             notifyAccessRequestsChanged();
 
@@ -2233,7 +2262,7 @@
                 try {
                     const db = firebase.firestore();
                     
-                    // Update access_control with declinedUsers
+                    // Update access_control with declinedUsers & updated approvedUsers
                     await db.collection('portal_settings').doc('access_control').set({
                         declinedUsers: declinedUsers,
                         approvedUsers: approvedUsers
@@ -2241,22 +2270,16 @@
 
                     const cleanDocId = 'req-' + targetEmail.replace(/[^a-zA-Z0-9]/g, '_');
                     if (reqId) {
-                        db.collection('access_requests').doc(reqId).delete().catch(() => {
-                            db.collection('access_requests').doc(reqId).set({ status: 'declined' }, { merge: true }).catch(() => {});
-                        });
+                        db.collection('access_requests').doc(reqId).delete().catch(() => {});
                     }
-                    db.collection('access_requests').doc(cleanDocId).delete().catch(() => {
-                        db.collection('access_requests').doc(cleanDocId).set({ status: 'declined' }, { merge: true }).catch(() => {});
-                    });
+                    db.collection('access_requests').doc(cleanDocId).delete().catch(() => {});
 
                     // Delete any other docs in access_requests with this email
                     const allReqs = await db.collection('access_requests').get();
                     allReqs.forEach(doc => {
                         const data = doc.data();
                         if ((data.email || '').toLowerCase().trim() === targetEmail) {
-                            doc.ref.delete().catch(() => {
-                                doc.ref.set({ status: 'declined' }, { merge: true }).catch(() => {});
-                            });
+                            doc.ref.delete().catch(() => {});
                         }
                     });
                 } catch(e) {
