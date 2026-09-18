@@ -903,8 +903,8 @@
             </div>
 
             <div class="flex-1 overflow-y-auto space-y-6 pr-1">
-                                                <!-- Firebase & Firestore Configuration -->
-                <div class="space-y-3">
+                <!-- Firebase & Firestore Configuration (Admin Only) -->
+                <div id="firebaseSettingsSection" class="hidden space-y-3">
                     <div class="flex items-center justify-between">
                         <h4 class="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Firebase & Firestore</h4>
                         <span id="firebaseStatusBadge" class="text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">Ready</span>
@@ -929,7 +929,7 @@
                     </div>
                 </div>
 
-                <hr class="border-slate-100 dark:border-slate-700">
+                <hr id="firebaseSettingsDivider" class="hidden border-slate-100 dark:border-slate-700">
                 <!-- Category Management -->
                 <div class="space-y-3">
                     <div class="flex items-center justify-between">
@@ -1254,6 +1254,10 @@
         let currentUser = JSON.parse(localStorage.getItem('portal_auth_user')) || null;
         let approvedUsers = JSON.parse(localStorage.getItem('portal_approved_users')) || [MAIN_ADMIN_EMAIL];
         let pendingRequests = JSON.parse(localStorage.getItem('portal_access_requests')) || [];
+
+        function isCurrentUserAdmin() {
+            return !!(currentUser && (currentUser.role === 'admin' || (currentUser.email && currentUser.email.toLowerCase() === MAIN_ADMIN_EMAIL.toLowerCase())));
+        }
         
         // Auto-migrate from old project config if present in client localStorage
         let savedConfig = JSON.parse(localStorage.getItem('portal_firebase_config'));
@@ -1831,6 +1835,10 @@
         }
 
         function saveFirebaseConfig() {
+            if (!isCurrentUserAdmin()) {
+                showToast('Admin access required to modify Firebase configuration');
+                return;
+            }
             const textarea = document.getElementById('firebaseConfigTextarea');
             const val = textarea.value.trim();
             if (!val) {
@@ -1850,11 +1858,19 @@
         }
 
         function loadDefaultFirebaseSample() {
+            if (!isCurrentUserAdmin()) {
+                showToast('Admin access required to modify Firebase configuration');
+                return;
+            }
             const textarea = document.getElementById('firebaseConfigTextarea');
             if (textarea) textarea.value = JSON.stringify(DEFAULT_FIREBASE_CONFIG, null, 2);
         }
 
         function clearFirebaseConfig() {
+            if (!isCurrentUserAdmin()) {
+                showToast('Admin access required to modify Firebase configuration');
+                return;
+            }
             localStorage.removeItem('portal_firebase_config');
             firebaseConfig = null;
             const textarea = document.getElementById('firebaseConfigTextarea');
@@ -1946,8 +1962,7 @@
             if (menuInitial) menuInitial.innerText = initial;
             if (menuName) menuName.innerText = currentUser.name || 'Portal User';
             if (menuEmail) menuEmail.innerText = currentUser.email;
-
-            const isAdmin = currentUser.email === MAIN_ADMIN_EMAIL;
+            const isAdmin = isCurrentUserAdmin();
             if (menuRole) {
                 menuRole.className = isAdmin 
                     ? 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 mb-2'
@@ -1955,6 +1970,24 @@
                 menuRole.innerHTML = isAdmin 
                     ? '<i class="fa-solid fa-shield-halved mr-1"></i> System Administrator'
                     : '<i class="fa-solid fa-user mr-1"></i> Approved Member';
+            }
+
+            // Firebase & Firestore Configuration: Visible ONLY for Admin
+            const fbSection = document.getElementById('firebaseSettingsSection');
+            const fbDivider = document.getElementById('firebaseSettingsDivider');
+            const fbArea = document.getElementById('firebaseConfigTextarea');
+            if (fbSection) {
+                if (isAdmin) {
+                    fbSection.classList.remove('hidden');
+                    if (fbArea && firebaseConfig) fbArea.value = JSON.stringify(firebaseConfig, null, 2);
+                } else {
+                    fbSection.classList.add('hidden');
+                    if (fbArea) fbArea.value = '';
+                }
+            }
+            if (fbDivider) {
+                if (isAdmin) fbDivider.classList.remove('hidden');
+                else fbDivider.classList.add('hidden');
             }
 
             if (navReqBtn) {
@@ -2301,8 +2334,15 @@
 
         window.onload = function() {
             initFirebase();
+            const isAdmin = isCurrentUserAdmin();
             const fbArea = document.getElementById("firebaseConfigTextarea");
-            if (fbArea && firebaseConfig) fbArea.value = JSON.stringify(firebaseConfig, null, 2);
+            if (fbArea) {
+                if (isAdmin && firebaseConfig) {
+                    fbArea.value = JSON.stringify(firebaseConfig, null, 2);
+                } else {
+                    fbArea.value = '';
+                }
+            }
             updateAuthUI();
             setupCrossTabSyncAndAutoRefresh();
 
@@ -3779,6 +3819,23 @@
         // Settings Modal & Category Management
         function openSettingsModal() {
             renderSettingsCategoryList();
+            const isAdmin = isCurrentUserAdmin();
+            const fbSection = document.getElementById('firebaseSettingsSection');
+            const fbDivider = document.getElementById('firebaseSettingsDivider');
+            const fbArea = document.getElementById('firebaseConfigTextarea');
+            if (fbSection) {
+                if (isAdmin) {
+                    fbSection.classList.remove('hidden');
+                    if (fbArea && firebaseConfig) fbArea.value = JSON.stringify(firebaseConfig, null, 2);
+                } else {
+                    fbSection.classList.add('hidden');
+                    if (fbArea) fbArea.value = '';
+                }
+            }
+            if (fbDivider) {
+                if (isAdmin) fbDivider.classList.remove('hidden');
+                else fbDivider.classList.add('hidden');
+            }
             document.getElementById('settingsModal').classList.remove('hidden');
         }
 
