@@ -71,9 +71,9 @@ Portal/
 
 ---
 
-## Deploy to Firebase Hosting
+## Deploy to Firebase Hosting (`portalhub-f3221`)
 
-PortalHub includes a ready-to-use [`firebase.json`](firebase.json) configured for fast single-page app hosting.
+PortalHub is pre-configured with [`.firebaserc`](.firebaserc) and [`firebase.json`](firebase.json) linked to project **`portalhub-f3221`**.
 
 ### Step 1: Install Firebase CLI
 If you haven't installed `firebase-tools`, install it globally using npm:
@@ -82,37 +82,42 @@ npm install -g firebase-tools
 ```
 
 ### Step 2: Log In to Firebase
-Log in with the Google account that manages your Firebase project:
+Log into the Google account (`felixpareja.pmdit07@gmail.com`) that owns the project:
 ```bash
 firebase login
 ```
 
-### Step 3: Select or Initialize Your Project
-From inside the `Portal` folder:
-```bash
-# Option A: Connect to an existing project (e.g., your portfolio project)
-firebase use --add
-
-# Option B: Create a brand new Firebase project in the Firebase Console
-# https://console.firebase.google.com/
+### Step 3: Project Configuration (Already Done!)
+Your local workspace is already connected to `portalhub-f3221` via `.firebaserc`:
+```json
+{
+  "projects": {
+    "default": "portalhub-f3221"
+  }
+}
 ```
 
-> **Note on Existing Sites**: If you use the existing `ipon-pse-portfolio` project, you can either:
-> 1. Deploy PortalHub as a secondary site using [Firebase Multisite](https://firebase.google.com/docs/hosting/multisite) (`firebase hosting:sites:create <subsite-name>`), OR
-> 2. Create a dedicated project like `portalhub-central` so your Ipon portfolio at `ipon-pse-portfolio.web.app` remains completely separate.
-
-### Step 4: Deploy
-Run the deploy command:
+### Step 4: Deploy to Hosting
+Run the deploy command inside `d:\PROJECTS\Portal`:
 ```bash
 firebase deploy --only hosting
 ```
-Once complete, Firebase will output your live URL:
-`https://<your-project-id>.web.app`
+Once complete, your app is live at:
+- **`https://portalhub-f3221.web.app`**
+- **`https://portalhub-f3221.firebaseapp.com`**
 
-### Step 5: Authorize Google Sign-In Domain
-To ensure Google Sign-In works on your live URL:
-1. Go to [Firebase Console](https://console.firebase.google.com/) -> Select your Project.
-2. Navigate to **Authentication** -> **Settings** tab -> **Authorized domains**.
-3. Confirm that your hosting domain (e.g. `your-app.web.app`) is listed in Authorized Domains.
+### Step 5: Firebase Console Setup (Authentication & Web App)
+On your [Firebase Console for portalhub-f3221](https://console.firebase.google.com/project/portalhub-f3221/overview):
+1. **Enable Google Sign-In**:
+   - In left menu, click **Authentication** &rarr; **Get Started**.
+   - Under **Sign-in providers**, click **Google** &rarr; toggle **Enable**.
+   - Select your support email (`felixpareja.pmdit07@gmail.com`) and click **Save**.
+2. **Add Web App** (for SDK Config):
+   - On the Project Overview page, click the **`+ Add app`** button and select the **`</>` Web** icon.
+   - App nickname: `PortalHub` &rarr; click **Register app**.
+   - Copy the generated `firebaseConfig` object and paste it into PortalHub Settings (or into `DEFAULT_FIREBASE_CONFIG` in `index.html`).
+3. **Verify Authorized Domains**:
+   - In **Authentication** &rarr; **Settings** &rarr; **Authorized domains**, ensure `portalhub-f3221.web.app` and `localhost` are listed.
+
 
 
