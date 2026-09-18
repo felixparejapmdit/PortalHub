@@ -1,0 +1,2346 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>PortalHub - Unified Service Gateway</title>
+    <!-- Apple Mobile Web App Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="PortalHub">
+    <!-- App Icons & Manifest -->
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="manifest" href="manifest.json">
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+        // Suppress Tailwind Play CDN development notice in browser console
+        (function() {
+            const _origWarn = console.warn;
+            console.warn = function(...args) {
+                if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
+                _origWarn.apply(console, args);
+            };
+        })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.4);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(156, 163, 175, 0.7);
+        }
+        .google-grid-shadow {
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.1);
+        }
+        .app-card-hover:hover {
+            background-color: rgba(241, 245, 249, 0.7);
+        }
+        .dark .app-card-hover:hover {
+            background-color: rgba(51, 65, 85, 0.5);
+        }
+        /* App Fullscreen & Sticky Top-Right Navigation Bar */
+        .app-fullscreen-mode {
+            overflow: hidden !important;
+        }
+        .app-fullscreen-mode header {
+            position: static !important;
+            height: 0 !important;
+            min-height: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            background: transparent !important;
+            pointer-events: none !important;
+            z-index: 50 !important;
+        }
+        .app-fullscreen-mode #headerLeft,
+        .app-fullscreen-mode #activeAppHeaderInfo {
+            display: none !important;
+        }
+        .app-fullscreen-mode #activeAppView {
+            position: fixed !important;
+            inset: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 30 !important;
+        }
+        .app-fullscreen-mode #appSubHeader {
+            display: none !important;
+        }
+        .app-fullscreen-mode #topRightNav {
+            position: fixed !important;
+            top: 0.875rem !important;
+            right: 1rem !important;
+            z-index: 50 !important;
+            pointer-events: auto !important;
+            background-color: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            border-radius: 1.25rem;
+            padding: 0.35rem 0.6rem;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .dark .app-fullscreen-mode #topRightNav {
+            background-color: rgba(15, 23, 42, 0.92);
+            border-color: rgba(51, 65, 85, 0.9);
+            box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.5), 0 8px 12px -6px rgba(0, 0, 0, 0.3);
+        }
+        /* Mode visibility rules */
+        .app-fullscreen-mode .dashboard-only-nav {
+            display: none !important;
+        }
+        .app-only-nav {
+            display: none !important;
+        }
+        .app-fullscreen-mode .app-only-nav {
+            display: flex !important;
+        }
+    </style>
+</head>
+<body class="h-full bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans antialiased overflow-hidden flex flex-col">
+
+    <header class="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 md:px-6 flex items-center justify-between z-30 shrink-0">
+        <!-- Left: Back Button & Branding -->
+        <div id="headerLeft" class="flex items-center space-x-3">
+            <button id="backToHomeBtn" onclick="returnToDashboard()" class="hidden items-center space-x-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-xs font-medium transition-colors text-slate-700 dark:text-slate-200">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span class="hidden sm:inline">Dashboard</span>
+            </button>
+            
+            <div class="flex items-center space-x-2.5 cursor-pointer" onclick="returnToDashboard()">
+                <div class="w-9 h-9 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+                    <i class="fa-solid fa-network-wired text-sm"></i>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <h1 class="font-bold text-base leading-tight tracking-tight">PortalHub</h1>
+                        <span id="gatewayStatusBadge" class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5" id="gatewayStatusDot"></span>
+                            <span id="gatewayStatusText">Checking Gateway...</span>
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Central Terminal</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center: Active App Breadcrumb -->
+        <div id="activeAppHeaderInfo" class="hidden items-center space-x-2 px-3.5 py-1.5 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-full text-xs font-medium text-blue-700 dark:text-blue-300">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span id="activeAppTitleHeader">Active App</span>
+            <span id="activeAppIpHeader" class="text-slate-400 dark:text-slate-500 font-mono text-[11px] pl-1.5 border-l border-blue-200 dark:border-blue-800"></span>
+        </div>
+
+        <!-- Right: Actions & Google App Launcher Grid (Becomes Sticky Floating Bar in Fullscreen) -->
+        <div id="topRightNav" class="flex items-center space-x-1.5 sm:space-x-2.5">
+            
+            <!-- APP MODE ONLY: Active App Info Pill -->
+            <div id="stickyAppInfo" class="app-only-nav items-center space-x-2 px-2.5 py-1 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 border border-slate-200/60 dark:border-slate-700/60 max-w-[150px] sm:max-w-[220px]">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                <span id="stickyActiveAppName" class="truncate font-bold">Active App</span>
+                <span id="stickyActiveAppIp" class="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate hidden lg:inline border-l border-slate-200 dark:border-slate-700 pl-1.5"></span>
+            </div>
+
+            <!-- APP MODE ONLY: Quick Return to Dashboard -->
+            <button onclick="returnToDashboard()" title="Return to Dashboard" class="app-only-nav items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium transition-colors border border-slate-200/60 dark:border-slate-700/60">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span class="hidden sm:inline">Dashboard</span>
+            </button>
+
+            <!-- APP MODE ONLY: Reload Active App -->
+            <button onclick="refreshActiveApp()" title="Reload App" class="app-only-nav w-8 h-8 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 items-center justify-center transition-colors">
+                <i class="fa-solid fa-rotate-right text-xs"></i>
+            </button>
+
+            <!-- APP MODE ONLY: Popout Active App to new tab -->
+            <button onclick="openInNewTab()" title="Open in New Tab" class="app-only-nav w-8 h-8 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 items-center justify-center transition-colors">
+                <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+            </button>
+
+            <!-- APP MODE ONLY: Native Browser Fullscreen Toggle -->
+            <button onclick="toggleNativeFullscreen()" title="Toggle Browser Fullscreen" class="app-only-nav w-8 h-8 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 items-center justify-center transition-colors">
+                <i id="fullscreenIcon" class="fa-solid fa-expand text-xs"></i>
+            </button>
+
+            <!-- DASHBOARD MODE ONLY: + Add IP App Button matching the reference image -->
+            <button onclick="openAddAppModal()" class="dashboard-only-nav hidden sm:flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors border border-slate-200 dark:border-slate-600">
+                <i class="fa-solid fa-plus text-blue-600 dark:text-blue-400"></i>
+                <span>Add IP App</span>
+            </button>
+
+            <!-- BOTH MODES: Theme Toggle -->
+            <button onclick="toggleDarkMode()" title="Toggle Theme" class="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors">
+                <i id="themeIcon" class="fa-solid fa-moon text-sm"></i>
+            </button>
+
+            <!-- DASHBOARD MODE ONLY: Settings / Categories -->
+            <button onclick="openSettingsModal()" title="Settings & Categories" class="dashboard-only-nav w-9 h-9 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors">
+                <i class="fa-solid fa-gear text-sm"></i>
+            </button>
+
+            <!-- BOTH MODES: Google Style 3x3 App Grid Launcher (App Switcher Menu) -->
+            <div class="relative">
+                <button id="appGridToggle" onclick="toggleAppGridDrawer()" title="Google App Launcher / Switcher" class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-md shadow-blue-500/25 transition-all hover:scale-105">
+                    <i class="fa-solid fa-grip text-sm sm:text-base"></i>
+                </button>
+
+                <!-- Floating App Grid Popover matching reference screenshot -->
+                <div id="appGridDrawer" class="hidden absolute right-0 mt-2.5 w-80 sm:w-96 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl google-grid-shadow p-5 z-50 transform origin-top-right transition-all animate-in fade-in zoom-in-95">
+                    
+                    <!-- Top section of popover -->
+                    <div class="flex items-center justify-between mb-3 px-1">
+                        <span class="text-sm font-bold text-slate-800 dark:text-slate-100 tracking-tight">Mga paborito mo</span>
+                        <button onclick="openSettingsModal(); toggleAppGridDrawer();" title="Edit Apps" class="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-100 flex items-center justify-center transition-colors">
+                            <i class="fa-solid fa-pen text-xs"></i>
+                        </button>
+                    </div>
+
+                    <!-- Favorite / Primary Apps Grid (3 columns) -->
+                    <div id="drawerFavoriteGrid" class="grid grid-cols-3 gap-2 py-1 max-h-[220px] overflow-y-auto">
+                        <!-- Populated dynamically -->
+                    </div>
+
+                    <!-- Divider & Secondary Section Header -->
+                    <div id="drawerSecondarySection" class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2 block">IBA PANG MGA SERBISYO</span>
+                        
+                        <!-- Secondary Apps Grid (3 columns) -->
+                        <div id="drawerSecondaryGrid" class="grid grid-cols-3 gap-2 py-1 max-h-[180px] overflow-y-auto">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Bottom Action Links matching reference image -->
+                    <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-xs font-medium">
+                        <button onclick="openAddAppModal(); toggleAppGridDrawer();" class="text-blue-600 dark:text-blue-400 hover:underline flex items-center space-x-1.5">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>Magdagdag ng App</span>
+                        </button>
+                        <button onclick="returnToDashboard(); toggleAppGridDrawer();" class="text-slate-600 dark:text-slate-300 hover:underline flex items-center space-x-1.5">
+                            <i class="fa-solid fa-globe"></i>
+                            <span>Buong Dashboard</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- APP MODE ONLY: Quick Close/Exit Button -->
+            <button onclick="returnToDashboard()" title="Exit App" class="app-only-nav w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 items-center justify-center transition-colors">
+                <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+
+            <!-- ADMIN ONLY: Access Requests Button with Badge -->
+            <button id="navAccessRequestsBtn" onclick="openAccessRequestsModal()" title="Family Member Access Requests" class="hidden dashboard-only-nav items-center space-x-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 dark:text-amber-400 border border-amber-500/30 text-xs font-semibold transition-all">
+                <i class="fa-solid fa-user-gear"></i>
+                <span class="hidden md:inline">Requests</span>
+                <span id="navPendingBadge" class="w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold flex items-center justify-center">0</span>
+            </button>
+
+            <!-- DASHBOARD MODE ONLY: User Avatar with Interactive Dropdown -->
+            <div class="dashboard-only-nav relative ml-1" id="userMenuContainer">
+                <button id="userAvatarBtn" onclick="toggleUserDropdown()" title="User Profile & Access" class="w-8 h-8 rounded-full bg-[#db2777] flex items-center justify-center text-white font-bold text-xs shadow-md shadow-pink-500/20 ring-2 ring-transparent hover:ring-pink-400 transition-all overflow-hidden">
+                    <span id="navAvatarInitial">F</span>
+                    <img id="navAvatarImg" src="" alt="Avatar" class="w-full h-full object-cover hidden">
+                </button>
+
+                <!-- User Dropdown Menu -->
+                <div id="userDropdownMenu" class="hidden absolute right-0 mt-2.5 w-64 bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-700/80 rounded-2xl shadow-2xl p-4 z-50 animate-in fade-in zoom-in-95">
+                    <div class="flex items-center space-x-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                        <div class="w-10 h-10 rounded-full bg-[#db2777] text-white font-bold flex items-center justify-center text-sm shadow-sm" id="menuAvatarIcon">
+                            <span id="menuAvatarInitial">F</span>
+                        </div>
+                        <div class="overflow-hidden">
+                            <h4 id="menuUserName" class="font-bold text-sm text-slate-900 dark:text-white truncate">Felix Pareja</h4>
+                            <p id="menuUserEmail" class="text-xs text-cyan-500 dark:text-cyan-400 font-mono truncate">felixpareja.pmdit07@gmail.com</p>
+                        </div>
+                    </div>
+                    
+                    <div class="py-2.5">
+                        <span id="menuRoleBadge" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 mb-2">
+                            <i class="fa-solid fa-shield-halved mr-1"></i> System Administrator
+                        </span>
+                        
+                        <div class="space-y-1">
+                            <button id="menuAccessRequestsLink" onclick="openAccessRequestsModal(); toggleUserDropdown();" class="w-full flex items-center justify-between px-2.5 py-2 text-xs rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors">
+                                <span class="flex items-center"><i class="fa-solid fa-user-gear mr-2 text-amber-500"></i> Access Requests</span>
+                                <span id="dropdownPendingBadge" class="px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold">0</span>
+                            </button>
+                            <button onclick="openSettingsModal(); toggleUserDropdown();" class="w-full flex items-center px-2.5 py-2 text-xs rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors">
+                                <i class="fa-solid fa-gear mr-2 text-blue-500"></i> Settings & Categories
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <button onclick="signOutAuth()" class="w-full flex items-center px-2.5 py-2 text-xs rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 transition-colors font-medium">
+                            <i class="fa-solid fa-arrow-right-from-bracket mr-2"></i> Sign Out
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Backdrop for App Grid Drawer to handle outside clicks cleanly even over iframes -->
+    <div id="drawerBackdrop" class="hidden fixed inset-0 z-40 bg-black/10 backdrop-blur-[0.5px]" onclick="toggleAppGridDrawer()"></div>
+
+    <main class="flex-1 relative overflow-hidden flex flex-col">
+        <!-- VIEW: Sign-In Gate -->
+        <div id="authSignInView" class="hidden flex-1 overflow-y-auto flex items-center justify-center p-4 sm:p-6 bg-[#070e17] text-white">
+            <div class="max-w-md w-full text-center space-y-6 animate-in fade-in zoom-in-95">
+                
+                <!-- Logo & Brand Header -->
+                <div class="flex flex-col items-center">
+                    <div class="w-20 h-20 rounded-3xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-2xl shadow-cyan-500/20 mb-4 ring-4 ring-cyan-500/20">
+                        <i class="fa-solid fa-network-wired text-3xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-extrabold text-white tracking-tight">PortalHub Terminal</h2>
+                    <p class="text-xs text-slate-400 mt-1 font-medium">Unified Service Gateway & Family Portfolio Hub</p>
+                </div>
+
+                <!-- Auth Card -->
+                <div class="bg-[#0f172a]/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 text-left backdrop-blur-xl">
+                    <div class="space-y-1 text-center">
+                        <h3 class="text-sm font-bold text-slate-200">Google Authentication</h3>
+                        <p class="text-xs text-slate-400">Sign in with your Google account to access your portfolio & services.</p>
+                    </div>
+
+                    <!-- Official Google Sign-In Container (GSI) -->
+                    <div class="flex flex-col items-center justify-center pt-2">
+                        <div id="g_id_onload"
+                             data-client_id=""
+                             data-context="signin"
+                             data-ux_mode="popup"
+                             data-callback="handleGoogleCredentialResponse"
+                             data-auto_prompt="false">
+                        </div>
+                        <div class="g_id_signin"
+                             data-type="standard"
+                             data-shape="pill"
+                             data-theme="filled_black"
+                             data-text="signin_with"
+                             data-size="large"
+                             data-logo_alignment="left"
+                             data-width="280">
+                        </div>
+                    </div>
+
+                    <div class="relative flex py-1 items-center">
+                        <div class="flex-grow border-t border-slate-800"></div>
+                        <span class="flex-shrink mx-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Quick Access</span>
+                        <div class="flex-grow border-t border-slate-800"></div>
+                    </div>
+
+                    <!-- Quick Preset Sign-In Buttons -->
+                    <div class="space-y-2.5">
+                        <button onclick="quickSignInAdmin()" class="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md shadow-blue-500/20 flex items-center justify-between transition-all">
+                            <span class="flex items-center space-x-2">
+                                <i class="fa-brands fa-google text-white"></i>
+                                <span>Sign In as Admin</span>
+                            </span>
+                            <span class="text-[10px] font-mono text-cyan-200 bg-white/10 px-2 py-0.5 rounded">felixpareja.pmdit07@gmail.com</span>
+                        </button>
+
+                        <button onclick="openDemoFamilySignInModal()" class="w-full py-2.5 px-4 bg-[#1e293b] hover:bg-[#273548] text-slate-300 border border-slate-700/70 font-semibold text-xs rounded-xl flex items-center justify-between transition-all">
+                            <span class="flex items-center space-x-2">
+                                <i class="fa-solid fa-users text-cyan-400"></i>
+                                <span>Sign In as Family Member / Requester</span>
+                            </span>
+                            <i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>
+                        </button>
+                    </div>
+
+                    <div class="bg-slate-900/80 rounded-xl p-3 border border-slate-800/80 text-[11px] text-slate-400 flex items-start space-x-2.5">
+                        <i class="fa-solid fa-shield-halved text-amber-400 text-sm mt-0.5 shrink-0"></i>
+                        <p class="leading-relaxed">
+                            Access is gated. Non-admin accounts require sign-up approval from <strong class="text-cyan-400 font-mono">felixpareja.pmdit07@gmail.com</strong>.
+                        </p>
+                    </div>
+                </div>
+
+                <p class="text-[11px] text-slate-500 font-mono">PortalHub PSE Portfolio Terminal • Access-Gated</p>
+            </div>
+        </div>
+
+        <!-- VIEW: Awaiting Admin Approval Screen (Exact match to Reference Image 1) -->
+        <div id="authPendingView" class="hidden flex-1 overflow-y-auto flex items-center justify-center p-4 sm:p-6 bg-[#070e17] text-white">
+            <div class="max-w-md w-full flex flex-col items-center text-center animate-in fade-in zoom-in-95">
+                
+                <!-- Glowing Lock Badge with Clock Icon matching Reference Image 1 -->
+                <div class="w-20 h-20 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center relative mb-5">
+                    <i class="fa-solid fa-lock text-2xl text-amber-400"></i>
+                    <span class="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center text-xs shadow-md">
+                        <i class="fa-solid fa-clock text-[10px]"></i>
+                    </span>
+                </div>
+
+                <!-- Pink Circle Avatar "F" matching Reference Image 1 -->
+                <div class="w-16 h-16 rounded-full bg-[#db2777] text-white font-bold text-2xl flex items-center justify-center mb-3 shadow-lg shadow-pink-500/20" id="pendingAvatarCircle">
+                    <span id="pendingAvatarLetter">F</span>
+                </div>
+
+                <!-- Title & Subtitle -->
+                <h2 class="text-2xl font-extrabold text-white tracking-tight mb-1">Request Submitted!</h2>
+                <div class="text-xs text-slate-400 font-medium">
+                    Signed in as
+                    <span id="pendingUserEmailDisplay" class="text-cyan-400 font-mono text-sm block mt-0.5">felixpareja.pmdit07@gmail.com</span>
+                </div>
+
+                <!-- Status Card matching Reference Image 1 -->
+                <div class="bg-[#0e1726] border border-slate-800 rounded-2xl p-5 text-left w-full my-6 space-y-2">
+                    <div class="flex items-center space-x-2 text-amber-400 font-semibold text-xs">
+                        <i class="fa-regular fa-bell text-amber-400"></i>
+                        <span class="font-bold tracking-wide">Awaiting Admin Approval</span>
+                    </div>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        Your access request has been sent to the portfolio admin 
+                        (<span class="text-cyan-400 font-mono font-medium">felixpareja.pmdit07@gmail.com</span>). 
+                        Once approved, sign in again to access your portfolio.
+                    </p>
+                </div>
+
+                <!-- Action Buttons matching Reference Image 1 -->
+                <div class="w-full space-y-3">
+                    <button onclick="checkApprovalStatus()" class="w-full py-3 px-4 rounded-xl bg-[#162338] hover:bg-[#1d2d47] text-slate-200 font-medium text-xs border border-slate-700/60 transition-all flex items-center justify-center space-x-2 shadow-sm">
+                        <i class="fa-solid fa-rotate text-xs"></i>
+                        <span>Check Approval Status</span>
+                    </button>
+
+                    <button onclick="signOutAuth()" class="w-full py-3 px-4 rounded-xl bg-[#162338]/60 hover:bg-[#1d2d47] text-slate-300 font-medium text-xs border border-slate-800 transition-all flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-arrow-right-from-bracket text-xs text-rose-400"></i>
+                        <span>Sign Out</span>
+                    </button>
+                </div>
+
+                <!-- Subtext Footer matching Reference Image 1 -->
+                <p class="text-[11px] text-slate-500 font-mono mt-8">iPon PSE Portfolio Terminal • Access-Gated</p>
+            </div>
+        </div>
+
+
+        <!-- VIEW 1: Full Central Dashboard -->
+        <div id="dashboardHomeView" class="flex-1 overflow-y-auto p-4 sm:p-8">
+            <div class="max-w-6xl mx-auto space-y-8 pb-12">
+                
+                <!-- Welcome Hero Banner (Compact) -->
+                <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 rounded-2xl sm:rounded-3xl p-5 sm:py-6 sm:px-8 text-white shadow-lg relative overflow-hidden flex flex-col justify-center">
+                    <div class="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+                    <div class="relative z-10 max-w-3xl">
+                        <div class="flex items-center space-x-2.5 mb-2">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white/20 backdrop-blur-md">
+                                <i class="fa-solid fa-server mr-1.5"></i> IP Hub Central Portal
+                            </span>
+                        </div>
+                        <h2 class="text-xl sm:text-2xl font-bold tracking-tight mb-1">Unified Service Gateway</h2>
+                        <p class="text-blue-100 text-xs sm:text-sm leading-relaxed">
+                            Unified launcher for your internal IP apps, local projects, and services.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Category Filtering & Count -->
+                <div class="space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h3 class="text-lg font-bold tracking-tight">Configured Services</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Filter services by category</p>
+                        </div>
+                        <div class="flex items-center space-x-2.5">
+                            <span id="appCountBadge" class="px-3 py-1 rounded-full bg-slate-200 dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300">0 apps</span>
+
+                            <!-- View Type Toggle: Grid vs Table -->
+                            <div class="flex items-center bg-slate-200/80 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+                                <button id="viewGridBtn" onclick="setViewType('grid')" title="Grid View" class="flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm">
+                                    <i class="fa-solid fa-table-cells-large"></i>
+                                    <span class="hidden sm:inline">Grid</span>
+                                </button>
+                                <button id="viewTableBtn" onclick="setViewType('table')" title="Table View" class="flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                                    <i class="fa-solid fa-table-list"></i>
+                                    <span class="hidden sm:inline">Table</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Category Pills -->
+                    <div id="categoryFilterBar" class="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- VIEW A: App Cards Grid -->
+                <div id="mainAppGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <!-- VIEW B: App Table View -->
+                <div id="mainAppTableWrapper" class="hidden bg-white dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 rounded-3xl shadow-sm overflow-hidden transition-all">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-100 dark:border-slate-700/70 bg-slate-50/75 dark:bg-slate-800/60 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    <th class="py-3.5 px-5">Service</th>
+                                    <th class="py-3.5 px-4">Category</th>
+                                    <th class="py-3.5 px-4">Endpoint / URL</th>
+                                    <th class="py-3.5 px-4 hidden md:table-cell">Description</th>
+                                    <th class="py-3.5 px-4 text-center">Status</th>
+                                    <th class="py-3.5 px-5 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mainAppTableBody" class="divide-y divide-slate-100 dark:divide-slate-700/60 text-sm">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- VIEW 2: Active App Frame (Opens apps in the same page) -->
+        <div id="activeAppView" class="hidden flex-1 flex flex-col bg-slate-950 relative">
+            <!-- App Sub-header bar (hidden in fullscreen mode, controls consolidated in sticky top-right nav) -->
+            <div id="appSubHeader" class="h-12 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between shrink-0 text-slate-300 text-xs">
+                <div class="flex items-center space-x-3 overflow-hidden">
+                    <span id="activeAppCategoryBadge" class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-medium">Service</span>
+                    <span id="activeAppIpDisplay" class="font-mono text-slate-400 truncate">http://localhost</span>
+                    <span class="flex items-center text-emerald-400 space-x-1 pl-2 border-l border-slate-700">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                        <span class="text-[11px]">Connected</span>
+                    </span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="refreshActiveApp()" title="Reload" class="px-2.5 py-1 rounded hover:bg-slate-800 transition-colors text-slate-400 hover:text-white flex items-center space-x-1">
+                        <i class="fa-solid fa-rotate-right"></i>
+                        <span class="hidden sm:inline">Reload</span>
+                    </button>
+                    <button onclick="openInNewTab()" title="Open in New Tab" class="px-2.5 py-1 rounded hover:bg-slate-800 transition-colors text-slate-400 hover:text-white flex items-center space-x-1">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        <span class="hidden sm:inline">Popout</span>
+                    </button>
+                    <button onclick="returnToDashboard()" title="Close" class="px-2.5 py-1 rounded bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 transition-colors flex items-center space-x-1 ml-2">
+                        <i class="fa-solid fa-xmark"></i>
+                        <span>Exit</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Banner for sites that restrict iframe embedding (e.g. Google, YouTube) -->
+            <div id="iframeSecurityBanner" class="hidden bg-amber-500/15 border-b border-amber-500/30 px-4 py-2.5 flex items-center justify-between text-amber-200 text-xs shrink-0 z-40">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-circle-info text-amber-400 text-sm"></i>
+                    <span><strong><span id="blockedDomainName">This site</span></strong> restricts embedding inside iframes (via <code class="bg-black/40 px-1 py-0.5 rounded text-amber-300">X-Frame-Options</code>).</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="openInNewTab()" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-lg text-xs transition-colors flex items-center space-x-1.5 shadow-sm">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        <span>Open in New Tab</span>
+                    </button>
+                    <button onclick="document.getElementById('iframeSecurityBanner').classList.add('hidden')" class="w-6 h-6 rounded hover:bg-amber-500/20 flex items-center justify-center text-amber-300">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- iframe or Simulated Viewport -->
+            <div class="flex-1 relative bg-slate-950 overflow-hidden flex flex-col" id="frameContainerWrapper">
+                <iframe id="serviceIframe" src="about:blank" class="w-full h-full border-0 hidden" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                <div id="simulatedAppContainer" class="w-full h-full flex flex-col items-center justify-center p-6 text-center overflow-y-auto">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <div id="appModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95">
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="appModalTitle" class="text-lg font-bold">Add New IP App</h3>
+                <button onclick="closeAddAppModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <form id="appForm" onsubmit="saveCustomApp(event)" class="space-y-4">
+                <input type="hidden" id="appEditId">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">App Name</label>
+                    <input type="text" id="appNameInput" required placeholder="e.g. Proxmox VE" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">IP Address, URL, or Local Path</label>
+                    <input type="text" id="appUrlInput" required placeholder="e.g. http://192.168.1.100:8006 or file:///D:/PROJECTS/PSE/index.html" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Category</label>
+                        <select id="appCategoryInput" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Icon (FontAwesome)</label>
+                        <input type="text" id="appIconInput" value="fa-server" placeholder="fa-server" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Section</label>
+                        <select id="appSectionInput" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="favorite">Favorite (Mga paborito mo)</option>
+                            <option value="secondary">Secondary (Iba pang serbisyo)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Open Behavior</label>
+                        <select id="appLaunchModeInput" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="iframe">Embedded Frame (Fullscreen)</option>
+                            <option value="newtab">New Tab (For Google/YouTube/etc.)</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Gradient Theme</label>
+                    <select id="appColorInput" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="from-blue-500 to-indigo-600">Blue & Indigo</option>
+                        <option value="from-emerald-500 to-teal-600">Emerald & Teal</option>
+                        <option value="from-amber-500 to-orange-600">Amber & Orange</option>
+                        <option value="from-purple-500 to-pink-600">Purple & Pink</option>
+                        <option value="from-rose-500 to-red-600">Rose & Red</option>
+                        <option value="from-cyan-500 to-blue-600">Cyan & Blue</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Description</label>
+                    <textarea id="appDescInput" rows="2" placeholder="App description..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div class="flex items-center justify-end space-x-3 pt-3">
+                    <button type="button" onclick="closeAddAppModal()" class="px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">Cancel</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm shadow-md transition-colors">Save App</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
+                <h3 class="text-lg font-bold flex items-center space-x-2">
+                    <i class="fa-solid fa-gear text-blue-600"></i>
+                    <span>Settings & Categories</span>
+                </h3>
+                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto space-y-6 pr-1">
+                                <!-- Google OAuth Configuration -->
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Google OAuth Sign-In</h4>
+                        <span class="text-xs text-slate-400">Client ID setup</span>
+                    </div>
+                    <div class="space-y-2">
+                        <input type="text" id="googleClientIdInput" placeholder="Enter Google OAuth Client ID..." class="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button type="button" onclick="saveGoogleClientId()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl">Save Client ID</button>
+                    </div>
+                </div>
+
+                <hr class="border-slate-100 dark:border-slate-700">
+                <!-- Category Management -->
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Manage Categories</h4>
+                        <span class="text-xs text-slate-400">Add, rename or delete categories</span>
+                    </div>
+
+                    <form onsubmit="addNewCategory(event)" class="flex space-x-2">
+                        <input type="text" id="newCategoryName" required placeholder="New Category Name..." class="flex-1 px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors">
+                            <i class="fa-solid fa-plus mr-1"></i> Add
+                        </button>
+                    </form>
+
+                    <div id="settingsCategoryList" class="space-y-2 max-h-40 overflow-y-auto p-1">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <hr class="border-slate-100 dark:border-slate-700">
+
+                <!-- Data Management: Start Empty & Load Sample Apps -->
+                <div class="space-y-3">
+                    <h4 class="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Data Management</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="loadSampleApps()" class="px-4 py-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-2xl text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all text-left flex flex-col space-y-1">
+                            <span class="font-bold text-xs flex items-center"><i class="fa-solid fa-rotate-left mr-1.5"></i> Load Sample Apps</span>
+                            <span class="text-[11px] opacity-80">Restore default services</span>
+                        </button>
+                        <button onclick="startEmptyPortal()" class="px-4 py-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-2xl text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-all text-left flex flex-col space-y-1">
+                            <span class="font-bold text-xs flex items-center"><i class="fa-solid fa-trash-can mr-1.5"></i> Start Empty</span>
+                            <span class="text-[11px] opacity-80">Clear all configured apps</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-3 border-t border-slate-100 dark:border-slate-700 flex justify-end">
+                <button onclick="closeSettingsModal()" class="px-5 py-2 bg-slate-800 dark:bg-slate-700 text-white rounded-xl text-xs font-medium hover:bg-slate-700 transition-colors">Done</button>
+            </div>
+        </div>
+    </div>
+
+        <!-- MODAL: Access Requests (Exact match to Reference Images 2 & 3) -->
+    <div id="accessRequestsModal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-[#0b1320] text-white border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in-95 max-h-[92vh] flex flex-col">
+            
+            <!-- Modal Header matching Reference Images 2 & 3 -->
+            <div class="flex items-center justify-between pb-4 border-b border-slate-800/80">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                        <i class="fa-solid fa-user-gear text-base"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-white leading-tight">Access Requests</h3>
+                        <p class="text-xs text-slate-400">Approve or decline family member sign-up requests</p>
+                    </div>
+                </div>
+                <button onclick="closeAccessRequestsModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <!-- Scrollable Content -->
+            <div class="flex-1 overflow-y-auto py-5 space-y-6 pr-1">
+                
+                <!-- Pending Requests List Container -->
+                <div id="pendingRequestsContainer">
+                    <!-- Populated dynamically: Shows Request Cards (Image 2) or "All requests processed!" (Image 3) -->
+                </div>
+
+                <!-- PRE-APPROVE A FAMILY MEMBER Section matching Reference Images 2 & 3 -->
+                <div class="pt-2 border-t border-slate-800/80">
+                    <span class="text-[11px] font-mono font-bold tracking-wider uppercase text-slate-400 block mb-3">
+                        PRE-APPROVE A FAMILY MEMBER
+                    </span>
+
+                    <form onsubmit="handlePreApproveSubmit(event)" class="space-y-3">
+                        <div>
+                            <input type="email" id="preApproveEmail" required placeholder="Email address (e.g. wife@gmail.com)" class="w-full px-3.5 py-2.5 rounded-xl bg-[#070e17] border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 font-mono">
+                        </div>
+                        <div>
+                            <input type="text" id="preApproveName" placeholder="Display name (optional)" class="w-full px-3.5 py-2.5 rounded-xl bg-[#070e17] border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                        </div>
+                        <button type="submit" class="w-full py-2.5 px-4 bg-[#22d3ee] hover:bg-[#06b6d4] text-slate-950 font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-2">
+                            <i class="fa-regular fa-envelope"></i>
+                            <span>Pre-Approve & Invite</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Already Approved Members List -->
+                <div class="pt-2 border-t border-slate-800/80">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-mono font-bold tracking-wider uppercase text-slate-400">
+                            APPROVED MEMBERS (<span id="approvedMembersCount">1</span>)
+                        </span>
+                    </div>
+                    <div id="approvedMembersList" class="space-y-2 max-h-36 overflow-y-auto pr-1">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-800/80 flex justify-end">
+                <button onclick="closeAccessRequestsModal()" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Custom Family Member / Test Sign-In -->
+    <div id="demoFamilySignInModal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-[#0b1320] text-white border border-slate-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl animate-in fade-in zoom-in-95">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                    <i class="fa-solid fa-user-plus text-cyan-400"></i>
+                    <span>Sign In with Any Account</span>
+                </h3>
+                <button onclick="closeDemoFamilySignInModal()" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleDemoSignInSubmit(event)" class="space-y-4 pt-4">
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Display Name</label>
+                    <input type="text" id="demoSignInName" required placeholder="e.g. Maria Pareja" class="w-full px-3.5 py-2.5 rounded-xl bg-[#070e17] border border-slate-800 text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Google Email Address</label>
+                    <input type="email" id="demoSignInEmail" required placeholder="e.g. maria.pareja@gmail.com" class="w-full px-3.5 py-2.5 rounded-xl bg-[#070e17] border border-slate-800 text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 font-mono">
+                </div>
+
+                <div class="pt-2 flex space-x-2">
+                    <button type="button" onclick="closeDemoFamilySignInModal()" class="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold">Cancel</button>
+                    <button type="submit" class="flex-1 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-slate-950 text-xs font-bold shadow-md">Sign In</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="toastNotification" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <div class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-3 rounded-2xl shadow-xl flex items-center space-x-3 border border-slate-800 dark:border-slate-100 text-sm font-medium">
+            <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+            <span id="toastMessage">Action completed successfully</span>
+        </div>
+    </div>
+
+    <script>
+        const defaultCategories = ['Finance', 'Tools', 'Dashboard'];
+        
+        const defaultApps = [
+            {
+                id: 'ipon',
+                name: 'Ipon',
+                url: 'https://ipon-pse-portfolio.web.app/',
+                category: 'Finance',
+                section: 'favorite',
+                icon: 'fa-piggy-bank',
+                color: 'from-emerald-500 to-teal-600',
+                launchMode: 'iframe',
+                description: 'PSE portfolio tracker and savings management application.'
+            }
+        ];
+
+        let categories = JSON.parse(localStorage.getItem('myportal_categories')) || defaultCategories;
+        let apps = JSON.parse(localStorage.getItem('myportal_apps')) || defaultApps;
+        let currentActiveApp = null;
+        let selectedCategoryFilter = 'All';
+        let currentViewType = localStorage.getItem('myportal_view_type') || 'grid';
+
+        function setViewType(type) {
+            currentViewType = type;
+            localStorage.setItem('myportal_view_type', type);
+            updateViewTypeUI();
+            renderDashboardGrid();
+        }
+
+        function updateViewTypeUI() {
+            const gridBtn = document.getElementById('viewGridBtn');
+            const tableBtn = document.getElementById('viewTableBtn');
+            const gridEl = document.getElementById('mainAppGrid');
+            const tableWrapper = document.getElementById('mainAppTableWrapper');
+
+            if (currentViewType === 'grid') {
+                if (gridBtn) {
+                    gridBtn.className = 'flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm';
+                }
+                if (tableBtn) {
+                    tableBtn.className = 'flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white';
+                }
+                if (gridEl) gridEl.classList.remove('hidden');
+                if (tableWrapper) tableWrapper.classList.add('hidden');
+            } else {
+                if (gridBtn) {
+                    gridBtn.className = 'flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white';
+                }
+                if (tableBtn) {
+                    tableBtn.className = 'flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm';
+                }
+                if (gridEl) gridEl.classList.add('hidden');
+                if (tableWrapper) tableWrapper.classList.remove('hidden');
+            }
+        }
+
+        
+        // ==========================================
+        // AUTHENTICATION & ACCESS CONTROL SYSTEM
+        // ==========================================
+        const MAIN_ADMIN_EMAIL = 'felixpareja.pmdit07@gmail.com';
+        
+        let currentUser = JSON.parse(localStorage.getItem('portal_auth_user')) || null;
+        let approvedUsers = JSON.parse(localStorage.getItem('portal_approved_users')) || [MAIN_ADMIN_EMAIL];
+        let pendingRequests = JSON.parse(localStorage.getItem('portal_access_requests')) || [];
+        let googleClientId = localStorage.getItem('portal_google_client_id') || '';
+
+        // Ensure Admin is always in approved list
+        if (!approvedUsers.includes(MAIN_ADMIN_EMAIL)) {
+            approvedUsers.unshift(MAIN_ADMIN_EMAIL);
+            localStorage.setItem('portal_approved_users', JSON.stringify(approvedUsers));
+        }
+
+        // Initialize Google Identity Services
+        function initGoogleIdentity() {
+            if (googleClientId && window.google && google.accounts && google.accounts.id) {
+                try {
+                    google.accounts.id.initialize({
+                        client_id: googleClientId,
+                        callback: handleGoogleCredentialResponse
+                    });
+                    const btn = document.querySelector('.g_id_signin');
+                    if (btn) {
+                        google.accounts.id.renderButton(btn, {
+                            type: 'standard',
+                            shape: 'pill',
+                            theme: 'filled_black',
+                            text: 'signin_with',
+                            size: 'large',
+                            logo_alignment: 'left',
+                            width: 280
+                        });
+                    }
+                } catch(e) {
+                    console.log('Google Identity init note:', e);
+                }
+            }
+        }
+
+        function handleGoogleCredentialResponse(response) {
+            try {
+                const base64Url = response.credential.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                const payload = JSON.parse(jsonPayload);
+                
+                processUserLogin({
+                    name: payload.name || payload.given_name || 'Google User',
+                    email: payload.email,
+                    picture: payload.picture || '',
+                    googleSub: payload.sub
+                });
+            } catch (e) {
+                console.error('Failed to parse Google credential', e);
+                showToast('Google Sign-In failed');
+            }
+        }
+
+        function quickSignInAdmin() {
+            processUserLogin({
+                name: 'Felix Pareja',
+                email: MAIN_ADMIN_EMAIL,
+                picture: ''
+            });
+        }
+
+        function openDemoFamilySignInModal() {
+            document.getElementById('demoFamilySignInModal').classList.remove('hidden');
+        }
+
+        function closeDemoFamilySignInModal() {
+            document.getElementById('demoFamilySignInModal').classList.add('hidden');
+        }
+
+        function handleDemoSignInSubmit(e) {
+            e.preventDefault();
+            const name = document.getElementById('demoSignInName').value.trim();
+            const email = document.getElementById('demoSignInEmail').value.trim().toLowerCase();
+            if (!email) return;
+
+            closeDemoFamilySignInModal();
+            processUserLogin({
+                name: name || email.split('@')[0],
+                email: email,
+                picture: ''
+            });
+        }
+
+        function processUserLogin(userData) {
+            userData.email = userData.email.toLowerCase();
+            const isAdmin = userData.email === MAIN_ADMIN_EMAIL;
+            const isApproved = isAdmin || approvedUsers.includes(userData.email);
+
+            if (isApproved) {
+                userData.role = isAdmin ? 'admin' : 'member';
+                userData.status = 'approved';
+                currentUser = userData;
+                localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
+                showToast(isAdmin ? 'Welcome back, Admin Felix!' : `Welcome back, ${userData.name}!`);
+            } else {
+                userData.role = 'requester';
+                userData.status = 'pending';
+                currentUser = userData;
+                localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
+
+                // Add to pending access requests if not already present
+                if (!pendingRequests.some(r => r.email === userData.email)) {
+                    const now = new Date();
+                    const options = { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true };
+                    const formattedDate = now.toLocaleString('en-US', options);
+
+                    pendingRequests.unshift({
+                        id: 'req-' + Date.now(),
+                        name: userData.name,
+                        email: userData.email,
+                        picture: userData.picture || '',
+                        requestedAt: formattedDate,
+                        status: 'pending'
+                    });
+                    localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
+                }
+                showToast('Access request submitted to admin');
+            }
+
+            updateAuthUI();
+        }
+
+        function checkApprovalStatus() {
+            if (!currentUser) return;
+            approvedUsers = JSON.parse(localStorage.getItem('portal_approved_users')) || [MAIN_ADMIN_EMAIL];
+            
+            if (approvedUsers.includes(currentUser.email)) {
+                currentUser.status = 'approved';
+                currentUser.role = currentUser.email === MAIN_ADMIN_EMAIL ? 'admin' : 'member';
+                localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
+                showToast('Access Granted! Entering PortalHub...');
+                updateAuthUI();
+            } else {
+                showToast('Still awaiting approval from ' + MAIN_ADMIN_EMAIL);
+            }
+        }
+
+        function signOutAuth() {
+            currentUser = null;
+            localStorage.removeItem('portal_auth_user');
+            const dropdown = document.getElementById('userDropdownMenu');
+            if (dropdown) dropdown.classList.add('hidden');
+            showToast('Signed out successfully');
+            updateAuthUI();
+        }
+
+        function updateAuthUI() {
+            const signInView = document.getElementById('authSignInView');
+            const pendingView = document.getElementById('authPendingView');
+            const dashboardView = document.getElementById('dashboardHomeView');
+            const activeAppView = document.getElementById('activeAppView');
+            const header = document.querySelector('header');
+            const navReqBtn = document.getElementById('navAccessRequestsBtn');
+            const pendingBadge = document.getElementById('navPendingBadge');
+            const dropdownBadge = document.getElementById('dropdownPendingBadge');
+            
+            // Refresh pending requests from storage
+            pendingRequests = JSON.parse(localStorage.getItem('portal_access_requests')) || [];
+            approvedUsers = JSON.parse(localStorage.getItem('portal_approved_users')) || [MAIN_ADMIN_EMAIL];
+
+            const pendingCount = pendingRequests.length;
+            if (pendingBadge) pendingBadge.innerText = pendingCount;
+            if (dropdownBadge) dropdownBadge.innerText = pendingCount;
+
+            if (!currentUser) {
+                // Not signed in
+                if (signInView) signInView.classList.remove('hidden');
+                if (pendingView) pendingView.classList.add('hidden');
+                if (dashboardView) dashboardView.classList.add('hidden');
+                if (activeAppView) activeAppView.classList.add('hidden');
+                if (header) header.classList.add('hidden');
+                return;
+            }
+
+            if (header) header.classList.remove('hidden');
+
+            if (currentUser.status === 'pending') {
+                // Awaiting Admin Approval
+                if (signInView) signInView.classList.add('hidden');
+                if (pendingView) pendingView.classList.remove('hidden');
+                if (dashboardView) dashboardView.classList.add('hidden');
+                if (activeAppView) activeAppView.classList.add('hidden');
+
+                const emailDisp = document.getElementById('pendingUserEmailDisplay');
+                if (emailDisp) emailDisp.innerText = currentUser.email;
+
+                const letterDisp = document.getElementById('pendingAvatarLetter');
+                if (letterDisp) letterDisp.innerText = (currentUser.name || currentUser.email).charAt(0).toUpperCase();
+
+                if (navReqBtn) navReqBtn.classList.add('hidden');
+                return;
+            }
+
+            // User is approved!
+            if (signInView) signInView.classList.add('hidden');
+            if (pendingView) pendingView.classList.add('hidden');
+            if (!currentActiveApp) {
+                if (dashboardView) dashboardView.classList.remove('hidden');
+            }
+
+            // Update user avatar & menu
+            const navInitial = document.getElementById('navAvatarInitial');
+            const menuInitial = document.getElementById('menuAvatarInitial');
+            const menuName = document.getElementById('menuUserName');
+            const menuEmail = document.getElementById('menuUserEmail');
+            const menuRole = document.getElementById('menuRoleBadge');
+            const menuReqLink = document.getElementById('menuAccessRequestsLink');
+
+            const initial = (currentUser.name || currentUser.email).charAt(0).toUpperCase();
+            if (navInitial) navInitial.innerText = initial;
+            if (menuInitial) menuInitial.innerText = initial;
+            if (menuName) menuName.innerText = currentUser.name || 'Portal User';
+            if (menuEmail) menuEmail.innerText = currentUser.email;
+
+            const isAdmin = currentUser.email === MAIN_ADMIN_EMAIL;
+            if (menuRole) {
+                menuRole.className = isAdmin 
+                    ? 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 mb-2'
+                    : 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 mb-2';
+                menuRole.innerHTML = isAdmin 
+                    ? '<i class="fa-solid fa-shield-halved mr-1"></i> System Administrator'
+                    : '<i class="fa-solid fa-user mr-1"></i> Approved Member';
+            }
+
+            if (navReqBtn) {
+                if (isAdmin) {
+                    navReqBtn.classList.remove('hidden');
+                    navReqBtn.classList.add('flex');
+                } else {
+                    navReqBtn.classList.add('hidden');
+                    navReqBtn.classList.remove('flex');
+                }
+            }
+
+            if (menuReqLink) {
+                if (isAdmin) menuReqLink.classList.remove('hidden');
+                else menuReqLink.classList.add('hidden');
+            }
+        }
+
+        function toggleUserDropdown() {
+            const menu = document.getElementById('userDropdownMenu');
+            if (menu) menu.classList.toggle('hidden');
+        }
+
+        // Close user dropdown on outside click
+        document.addEventListener('click', function(e) {
+            const container = document.getElementById('userMenuContainer');
+            const menu = document.getElementById('userDropdownMenu');
+            if (container && menu && !container.contains(e.target)) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        // ==========================================
+        // ADMIN ACCESS REQUESTS MODAL (Images 2 & 3)
+        // ==========================================
+        function openAccessRequestsModal() {
+            renderAccessRequestsList();
+            document.getElementById('accessRequestsModal').classList.remove('hidden');
+        }
+
+        function closeAccessRequestsModal() {
+            document.getElementById('accessRequestsModal').classList.add('hidden');
+            updateAuthUI();
+        }
+
+        function renderAccessRequestsList() {
+            pendingRequests = JSON.parse(localStorage.getItem('portal_access_requests')) || [];
+            approvedUsers = JSON.parse(localStorage.getItem('portal_approved_users')) || [MAIN_ADMIN_EMAIL];
+
+            const container = document.getElementById('pendingRequestsContainer');
+            const countBadge = document.getElementById('approvedMembersCount');
+            const approvedList = document.getElementById('approvedMembersList');
+
+            if (countBadge) countBadge.innerText = approvedUsers.length;
+
+            // Render Pending Requests List (Image 2 vs Image 3)
+            if (pendingRequests.length === 0) {
+                // Empty State matching Reference Image 3
+                container.innerHTML = `
+                    <div class="py-8 text-center animate-in fade-in">
+                        <div class="w-14 h-14 rounded-full border-2 border-emerald-400 text-emerald-400 flex items-center justify-center mx-auto mb-3 text-2xl shadow-lg shadow-emerald-500/10">
+                            <i class="fa-solid fa-check"></i>
+                        </div>
+                        <h4 class="text-white font-mono text-base font-semibold tracking-wide">All requests processed!</h4>
+                    </div>
+                `;
+            } else {
+                // Pending Request Cards matching Reference Image 2
+                container.innerHTML = `
+                    <div class="space-y-3">
+                        ${pendingRequests.map(req => `
+                            <div class="bg-[#0f172a] border border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-md">
+                                <div class="flex items-center space-x-3 overflow-hidden">
+                                    <div class="w-10 h-10 rounded-full bg-[#db2777] text-white font-bold flex items-center justify-center shrink-0 shadow-md">
+                                        ${(req.name || req.email).charAt(0).toUpperCase()}
+                                    </div>
+                                    <div class="overflow-hidden pr-2">
+                                        <h5 class="text-sm font-bold text-white truncate">${req.name || 'Family Member'}</h5>
+                                        <p class="text-xs text-cyan-400 font-mono truncate">${req.email}</p>
+                                        <p class="text-[10px] text-slate-400 font-mono mt-0.5">Requested: ${req.requestedAt}</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2 shrink-0">
+                                    <button onclick="approveAccessRequest('${req.id}')" class="px-3.5 py-1.5 bg-[#10b981] hover:bg-[#059669] text-white text-xs font-bold rounded-xl flex items-center space-x-1.5 shadow-sm transition-colors">
+                                        <i class="fa-solid fa-check text-[11px]"></i>
+                                        <span>Approve</span>
+                                    </button>
+                                    <button onclick="declineAccessRequest('${req.id}')" class="px-3 py-1.5 bg-[#be123c]/40 hover:bg-[#be123c]/60 text-rose-300 border border-rose-500/30 text-xs font-semibold rounded-xl flex items-center space-x-1 transition-colors">
+                                        <i class="fa-solid fa-xmark text-[11px]"></i>
+                                        <span>Decline</span>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            // Render Approved Members List
+            if (approvedList) {
+                approvedList.innerHTML = approvedUsers.map(email => `
+                    <div class="flex items-center justify-between p-2.5 rounded-xl bg-[#070e17] border border-slate-800/80 text-xs">
+                        <div class="flex items-center space-x-2 overflow-hidden">
+                            <span class="w-2 h-2 rounded-full ${email === MAIN_ADMIN_EMAIL ? 'bg-amber-400' : 'bg-emerald-400'}"></span>
+                            <span class="font-mono text-slate-300 truncate">${email}</span>
+                            ${email === MAIN_ADMIN_EMAIL ? '<span class="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 rounded">Admin</span>' : ''}
+                        </div>
+                        ${email !== MAIN_ADMIN_EMAIL ? `
+                            <button onclick="revokeApprovedUser('${email}')" title="Revoke Access" class="text-slate-500 hover:text-rose-400 transition-colors p-1">
+                                <i class="fa-solid fa-trash text-xs"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                `).join('');
+            }
+        }
+
+        function approveAccessRequest(reqId) {
+            const req = pendingRequests.find(r => r.id === reqId);
+            if (!req) return;
+
+            if (!approvedUsers.includes(req.email)) {
+                approvedUsers.push(req.email);
+                localStorage.setItem('portal_approved_users', JSON.stringify(approvedUsers));
+            }
+
+            pendingRequests = pendingRequests.filter(r => r.id !== reqId);
+            localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
+
+            showToast(`Approved access for ${req.name || req.email}`);
+            renderAccessRequestsList();
+            updateAuthUI();
+        }
+
+        function declineAccessRequest(reqId) {
+            const req = pendingRequests.find(r => r.id === reqId);
+            if (!req) return;
+
+            pendingRequests = pendingRequests.filter(r => r.id !== reqId);
+            localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
+
+            showToast(`Declined request for ${req.name || req.email}`);
+            renderAccessRequestsList();
+            updateAuthUI();
+        }
+
+        function handlePreApproveSubmit(e) {
+            e.preventDefault();
+            const emailInput = document.getElementById('preApproveEmail');
+            const nameInput = document.getElementById('preApproveName');
+            const email = emailInput.value.trim().toLowerCase();
+            const name = nameInput.value.trim();
+
+            if (!email) return;
+
+            if (approvedUsers.includes(email)) {
+                showToast('User is already approved');
+                return;
+            }
+
+            approvedUsers.push(email);
+            localStorage.setItem('portal_approved_users', JSON.stringify(approvedUsers));
+
+            // Also clear if they had a pending request
+            pendingRequests = pendingRequests.filter(r => r.email !== email);
+            localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
+
+            emailInput.value = '';
+            nameInput.value = '';
+            showToast(`Pre-approved ${name || email}!`);
+            renderAccessRequestsList();
+            updateAuthUI();
+        }
+
+        function revokeApprovedUser(email) {
+            if (email === MAIN_ADMIN_EMAIL) return;
+            if (!confirm(`Revoke portal access for ${email}?`)) return;
+
+            approvedUsers = approvedUsers.filter(e => e !== email);
+            localStorage.setItem('portal_approved_users', JSON.stringify(approvedUsers));
+
+            // If current user is the revoked user, kick back to pending
+            if (currentUser && currentUser.email === email) {
+                currentUser.status = 'pending';
+                localStorage.setItem('portal_auth_user', JSON.stringify(currentUser));
+            }
+
+            showToast(`Revoked access for ${email}`);
+            renderAccessRequestsList();
+            updateAuthUI();
+        }
+
+        function saveGoogleClientId() {
+            const input = document.getElementById('googleClientIdInput');
+            googleClientId = input.value.trim();
+            localStorage.setItem('portal_google_client_id', googleClientId);
+            showToast('Google Client ID saved');
+            initGoogleIdentity();
+        }
+
+        window.onload = function() {
+            initGoogleIdentity();
+            updateAuthUI();
+
+            // Migration: Purge legacy dummy sample apps and ensure Ipon is set as default sample app
+            const legacySampleIds = ['pse-local', 'portainer', 'proxmox', 'homeassistant', 'nas-storage', 'grafana', 'jenkins', 'search-engine', 'calendar-app', 'news-portal'];
+            const hasLegacySamples = apps.some(a => legacySampleIds.includes(a.id));
+            const hasIpon = apps.some(a => a.id === 'ipon');
+            
+            if (hasLegacySamples || !hasIpon) {
+                // Filter out legacy sample apps
+                apps = apps.filter(a => !legacySampleIds.includes(a.id));
+                // Add Ipon if not already present
+                if (!apps.some(a => a.id === 'ipon')) {
+                    apps.unshift(JSON.parse(JSON.stringify(defaultApps[0])));
+                }
+                // Ensure Finance category is present
+                if (!categories.includes('Finance')) {
+                    categories.unshift('Finance');
+                }
+                // Filter out categories that belonged exclusively to removed sample apps if user hasn't added custom ones
+                const oldDefaultCats = ['Server', 'Storage', 'Analytics', 'Database'];
+                const appsCategories = new Set(apps.map(a => a.category));
+                categories = categories.filter(c => appsCategories.has(c) || defaultCategories.includes(c) || !oldDefaultCats.includes(c));
+                if (categories.length === 0) categories = [...defaultCategories];
+
+                localStorage.setItem('myportal_apps', JSON.stringify(apps));
+                localStorage.setItem('myportal_categories', JSON.stringify(categories));
+            }
+
+            // Auto-heal any previously stored URLs corrupted with https://file:///
+            let hasChanges = false;
+            apps = apps.map(app => {
+                if (app.url && /^https?:\/\/file:\/\/\/?/i.test(app.url)) {
+                    app.url = app.url.replace(/^https?:\/\/file:\/\/\/?/i, 'file:///');
+                    hasChanges = true;
+                }
+                return app;
+            });
+            if (hasChanges) {
+                localStorage.setItem('myportal_apps', JSON.stringify(apps));
+            }
+
+            updateViewTypeUI();
+            renderCategoryFilterBar();
+            renderDashboardGrid();
+            renderDrawerGrids();
+            checkSystemTheme();
+            checkLocalServerStatus();
+            const gIdInput = document.getElementById("googleClientIdInput");
+            if (gIdInput) gIdInput.value = googleClientId;
+            
+            // Close drawer on outside click
+            document.addEventListener('click', function(e) {
+                const drawer = document.getElementById('appGridDrawer');
+                const toggleBtn = document.getElementById('appGridToggle');
+                const backdrop = document.getElementById('drawerBackdrop');
+                if (!drawer || !toggleBtn) return;
+                if (!drawer.contains(e.target) && !toggleBtn.contains(e.target) && !drawer.classList.contains('hidden')) {
+                    if (e.target !== backdrop) {
+                        toggleAppGridDrawer();
+                    }
+                }
+            });
+
+            // Escape key closes open drawers or modals
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    const drawer = document.getElementById('appGridDrawer');
+                    if (drawer && !drawer.classList.contains('hidden')) {
+                        toggleAppGridDrawer();
+                    }
+                }
+            });
+        };
+
+        // Render Category Filter Bar on Dashboard
+        function renderCategoryFilterBar() {
+            const bar = document.getElementById('categoryFilterBar');
+            const allCount = apps.length;
+            
+            let html = `
+                <button onclick="filterAppsByCategory('All')" class="px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${selectedCategoryFilter === 'All' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50'}">
+                    All Apps (${allCount})
+                </button>
+            `;
+
+            categories.forEach(cat => {
+                const count = apps.filter(a => a.category === cat).length;
+                html += `
+                    <button onclick="filterAppsByCategory('${cat}')" class="px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${selectedCategoryFilter === cat ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50'}">
+                        ${cat} (${count})
+                    </button>
+                `;
+            });
+
+            bar.innerHTML = html;
+        }
+
+        function filterAppsByCategory(category) {
+            selectedCategoryFilter = category;
+            renderCategoryFilterBar();
+            renderDashboardGrid();
+        }
+
+        // Render Dashboard App Cards & Table
+        function renderDashboardGrid() {
+            const grid = document.getElementById('mainAppGrid');
+            const tableBody = document.getElementById('mainAppTableBody');
+            const countBadge = document.getElementById('appCountBadge');
+            
+            const filteredApps = selectedCategoryFilter === 'All' 
+                ? apps 
+                : apps.filter(a => a.category === selectedCategoryFilter);
+
+            countBadge.innerText = `${filteredApps.length} apps`;
+
+            if (filteredApps.length === 0) {
+                const emptyHtml = `
+                    <div class="col-span-full py-16 text-center">
+                        <div class="w-16 h-16 bg-slate-200 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
+                            <i class="fa-solid fa-folder-open text-2xl"></i>
+                        </div>
+                        <h4 class="font-semibold text-base mb-1">No apps found</h4>
+                        <p class="text-xs text-slate-500 mb-4">No apps available in this category.</p>
+                        <button onclick="openAddAppModal()" class="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold shadow-md">Add IP App</button>
+                    </div>
+                `;
+                if (grid) grid.innerHTML = emptyHtml;
+                if (tableBody) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="py-16 text-center text-slate-400">
+                                <i class="fa-solid fa-folder-open text-2xl mb-2 block"></i>
+                                <span class="font-semibold text-sm block mb-1">No apps found</span>
+                                <span class="text-xs text-slate-500 block mb-4">No apps available in this category.</span>
+                                <button onclick="openAddAppModal()" class="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold shadow-md">Add IP App</button>
+                            </td>
+                        </tr>
+                    `;
+                }
+                return;
+            }
+
+            // Populate Grid View
+            if (grid) {
+                grid.innerHTML = filteredApps.map(app => `
+                    <div onclick="launchApp('${app.id}')" class="group bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between relative overflow-hidden cursor-pointer">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${app.color} opacity-5 group-hover:opacity-10 rounded-bl-full transition-opacity pointer-events-none"></div>
+                        <div>
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr ${app.color} flex items-center justify-center text-white shadow-md shadow-blue-500/10 group-hover:scale-110 transition-transform">
+                                    <i class="fa-solid ${app.icon} text-lg"></i>
+                                </div>
+                                <div class="flex items-center space-x-1" onclick="event.stopPropagation()">
+                                    <span class="text-[11px] font-medium px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">
+                                        ${app.category}
+                                    </span>
+                                    <button onclick="event.stopPropagation(); openEditAppModal('${app.id}')" title="Edit App" class="w-7 h-7 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                                        <i class="fa-solid fa-pen text-xs"></i>
+                                    </button>
+                                    <button onclick="event.stopPropagation(); deleteApp('${app.id}')" title="Delete App" class="w-7 h-7 rounded-full hover:bg-rose-100 dark:hover:bg-rose-950/50 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors">
+                                        <i class="fa-solid fa-trash text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <h4 class="font-bold text-base mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">${app.name}</h4>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-4 leading-relaxed">${app.description || 'No description provided.'}</p>
+                        </div>
+                        <div class="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs">
+                            <span class="font-mono text-slate-400 dark:text-slate-500 truncate max-w-[180px]">${app.url}</span>
+                            <span class="text-blue-600 dark:text-blue-400 font-semibold flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span>Open</span>
+                                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                            </span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Populate Table View
+            if (tableBody) {
+                tableBody.innerHTML = filteredApps.map(app => `
+                    <tr onclick="launchApp('${app.id}')" class="group hover:bg-slate-50/90 dark:hover:bg-slate-700/40 transition-colors cursor-pointer">
+                        <td class="py-3.5 px-5">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr ${app.color} flex items-center justify-center text-white shadow-sm shrink-0 group-hover:scale-105 transition-transform">
+                                    <i class="fa-solid ${app.icon} text-sm"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="font-bold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors text-sm truncate flex items-center space-x-1.5">
+                                        <span>${app.name}</span>
+                                        ${app.launchMode === 'newtab' ? '<span class="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300">Tab</span>' : ''}
+                                    </div>
+                                    <span class="text-[11px] text-slate-400 dark:text-slate-500 font-mono truncate block sm:hidden">${app.url}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-3.5 px-4 whitespace-nowrap">
+                            <span class="text-[11px] font-medium px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">
+                                ${app.category}
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-4">
+                            <span class="font-mono text-xs text-slate-500 dark:text-slate-400 truncate max-w-[200px] sm:max-w-[260px] inline-block" title="${app.url}">
+                                ${app.url}
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-4 hidden md:table-cell">
+                            <p class="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[260px]" title="${app.description || ''}">
+                                ${app.description || '—'}
+                            </p>
+                        </td>
+                        <td class="py-3.5 px-4 text-center whitespace-nowrap">
+                            <span class="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span>Online</span>
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-5 text-right whitespace-nowrap" onclick="event.stopPropagation()">
+                            <div class="flex items-center justify-end space-x-1">
+                                <button onclick="event.stopPropagation(); launchApp('${app.id}')" title="Launch in Fullscreen" class="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 text-xs font-semibold transition-colors flex items-center space-x-1">
+                                    <i class="fa-solid fa-play text-[10px]"></i>
+                                    <span class="hidden sm:inline">Launch</span>
+                                </button>
+                                <button onclick="event.stopPropagation(); window.open('${app.url}', '_blank')" title="Open in New Tab" class="w-7 h-7 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 flex items-center justify-center transition-colors">
+                                    <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                                </button>
+                                <button onclick="event.stopPropagation(); openEditAppModal('${app.id}')" title="Edit App" class="w-7 h-7 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                                    <i class="fa-solid fa-pen text-xs"></i>
+                                </button>
+                                <button onclick="event.stopPropagation(); deleteApp('${app.id}')" title="Delete App" class="w-7 h-7 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors">
+                                    <i class="fa-solid fa-trash text-xs"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        // Render Google-style App Popover Grids (Favorite & Secondary with green status dots)
+        function renderDrawerGrids() {
+            const favGrid = document.getElementById('drawerFavoriteGrid');
+            const secGrid = document.getElementById('drawerSecondaryGrid');
+            const secSection = document.getElementById('drawerSecondarySection');
+
+            const favoriteApps = apps.filter(a => a.section === 'favorite' || !a.section);
+            const secondaryApps = apps.filter(a => a.section === 'secondary');
+
+            if (favGrid) {
+                favGrid.innerHTML = favoriteApps.map(app => `
+                    <div onclick="launchApp('${app.id}'); toggleAppGridDrawer();" class="group relative flex flex-col items-center p-2.5 rounded-2xl app-card-hover cursor-pointer transition-all text-center">
+                        <span class="absolute top-2 right-3 w-2 h-2 rounded-full bg-emerald-500"></span>
+                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr ${app.color} flex items-center justify-center text-white shadow-sm mb-1.5 group-hover:scale-105 transition-transform">
+                            <i class="fa-solid ${app.icon} text-base"></i>
+                        </div>
+                        <span class="text-[11px] font-medium text-slate-700 dark:text-slate-200 truncate w-full">${app.name}</span>
+                    </div>
+                `).join('');
+            }
+
+            if (secSection) {
+                if (secondaryApps.length === 0) {
+                    secSection.classList.add('hidden');
+                } else {
+                    secSection.classList.remove('hidden');
+                }
+            }
+
+            if (secGrid) {
+                secGrid.innerHTML = secondaryApps.map(app => `
+                    <div onclick="launchApp('${app.id}'); toggleAppGridDrawer();" class="group relative flex flex-col items-center p-2.5 rounded-2xl app-card-hover cursor-pointer transition-all text-center">
+                        <span class="absolute top-2 right-3 w-2 h-2 rounded-full bg-emerald-500"></span>
+                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr ${app.color} flex items-center justify-center text-white shadow-sm mb-1.5 group-hover:scale-105 transition-transform">
+                            <i class="fa-solid ${app.icon} text-base"></i>
+                        </div>
+                        <span class="text-[11px] font-medium text-slate-700 dark:text-slate-200 truncate w-full">${app.name}</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function toggleAppGridDrawer() {
+            const drawer = document.getElementById('appGridDrawer');
+            const backdrop = document.getElementById('drawerBackdrop');
+            if (!drawer) return;
+            const isHidden = drawer.classList.contains('hidden');
+            if (isHidden) {
+                drawer.classList.remove('hidden');
+                if (backdrop) backdrop.classList.remove('hidden');
+            } else {
+                drawer.classList.add('hidden');
+                if (backdrop) backdrop.classList.add('hidden');
+            }
+        }
+
+        let isLocalServerOnline = false;
+
+        function checkLocalServerStatus() {
+            // Ping port 8088 to check if local gateway server is active
+            const testEndpoints = [
+                'http://127.0.0.1:8088/PSE/index.html',
+                'http://localhost:8088/PSE/index.html'
+            ];
+            
+            let checked = false;
+            testEndpoints.forEach(endpoint => {
+                fetch(endpoint, { method: 'HEAD', mode: 'no-cors' })
+                    .then(() => {
+                        if (!checked) {
+                            checked = true;
+                            isLocalServerOnline = true;
+                            updateGatewayBadge(true);
+                        }
+                    })
+                    .catch(() => {
+                        if (!checked) {
+                            setTimeout(() => {
+                                if (!isLocalServerOnline) updateGatewayBadge(false);
+                            }, 500);
+                        }
+                    });
+            });
+        }
+
+        function updateGatewayBadge(isOnline) {
+            const badge = document.getElementById('gatewayStatusBadge');
+            const dot = document.getElementById('gatewayStatusDot');
+            const text = document.getElementById('gatewayStatusText');
+            if (!badge || !dot || !text) return;
+
+            if (window.location.protocol.startsWith('http')) {
+                badge.className = 'hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800';
+                dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse';
+                text.innerText = `Port ${window.location.port || '80'} Gateway`;
+            } else if (isOnline) {
+                badge.className = 'hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800';
+                dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse';
+                text.innerText = 'Local Gateway :8088 Active';
+            } else {
+                badge.className = 'hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800 cursor-pointer';
+                dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5';
+                text.innerText = 'file:// Mode (Run start_portal.bat)';
+                badge.title = 'Click for info on embedding local files';
+                badge.onclick = () => alert('You are running MyPortal directly from a file:// URL. To embed local apps (like PSE) without browser security restrictions, double-click "start_portal.bat" in the Portal folder to launch via http://localhost:8088.');
+            }
+        }
+
+        function normalizeAppUrl(rawInput) {
+            if (!rawInput) return '';
+            let input = rawInput.trim().replace(/\\+/g, '/');
+
+            // Handle file:/// or local drive letters (e.g. D:/PROJECTS/PSE/index.html)
+            const isLocalDrive = /^[a-zA-Z]:\//i.test(input);
+            const isFileProto = /^file:\/\/\//i.test(input) || /^file:\/\//i.test(input);
+
+            if (isFileProto || isLocalDrive) {
+                if (isLocalDrive) return 'file:///' + input;
+                return 'file:///' + input.replace(/^file:\/\/\/?/i, '');
+            }
+
+            // Relative paths like ../PSE/index.html or /PSE/index.html
+            if (input.startsWith('../') || input.startsWith('./') || input.startsWith('/')) {
+                return input;
+            }
+
+            // Check if standard HTTP/HTTPS
+            if (!input.startsWith('http://') && !input.startsWith('https://')) {
+                if (/^(?:localhost|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::\d+)?(?:\/.*)?$/i.test(input)) {
+                    return 'http://' + input;
+                } else if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?::\d+)?(?:\/.*)?$/i.test(input)) {
+                    return 'https://' + input;
+                } else {
+                    return 'http://' + input;
+                }
+            }
+
+            return input;
+        }
+
+        function isLocalFileUrl(url) {
+            if (!url) return false;
+            const lower = url.toLowerCase().replace(/\\+/g, '/');
+            return lower.startsWith('file:') || /^[a-z]:\//i.test(lower);
+        }
+
+        function isKnownIframeBlocked(url) {
+            if (!url) return false;
+            const lower = url.toLowerCase();
+            // YouTube embed URLs are allowed, but main youtube.com / watch page is blocked
+            if (lower.includes('youtube.com/embed') || lower.includes('youtube-nocookie.com')) {
+                return false;
+            }
+            const blockedDomains = [
+                'google.com', 'google.',
+                'youtube.com', 'youtu.be',
+                'github.com',
+                'facebook.com',
+                'twitter.com', 'x.com',
+                'linkedin.com',
+                'instagram.com',
+                'reddit.com',
+                'netflix.com'
+            ];
+            return blockedDomains.some(d => lower.includes(d));
+        }
+
+        function getEmbeddableUrl(url) {
+            if (!url) return '';
+            let formatted = normalizeAppUrl(url);
+
+            // Check if URL points to a subproject in PROJECTS folder
+            const matchProjects = formatted.match(/(?:file:\/\/\/[a-zA-Z]:\/|[a-zA-Z]:\/)?(?:.*\/)?PROJECTS\/(.*)$/i);
+
+            // If portal is loaded over HTTP (e.g. http://localhost:8088/Portal/central_dashboard_portal.html)
+            if (window.location.protocol.startsWith('http')) {
+                if (matchProjects && matchProjects[1]) {
+                    const cleanSub = matchProjects[1].replace(/^\/+/, '');
+                    return `${window.location.origin}/${cleanSub}`;
+                }
+                if (formatted.startsWith('/')) {
+                    return `${window.location.origin}${formatted}`;
+                }
+            } else if (window.location.protocol === 'file:' && isLocalServerOnline) {
+                // If in file mode but port 8088 is online, route local PROJECTS apps via http://localhost:8088/
+                if (matchProjects && matchProjects[1]) {
+                    const cleanSub = matchProjects[1].replace(/^\/+/, '');
+                    return `http://localhost:8088/${cleanSub}`;
+                }
+            }
+
+            // Auto-convert YouTube watch URLs or youtu.be URLs to embed URLs
+            const ytWatchMatch = formatted.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/i);
+            if (ytWatchMatch && ytWatchMatch[1]) {
+                return `https://www.youtube.com/embed/${ytWatchMatch[1]}?autoplay=1`;
+            }
+
+            return formatted;
+        }
+
+        function forceIframeLoad(encodedUrl) {
+            const url = decodeURIComponent(encodedUrl);
+            const iframe = document.getElementById('serviceIframe');
+            const simulatedContainer = document.getElementById('simulatedAppContainer');
+            if (simulatedContainer) simulatedContainer.classList.add('hidden');
+            if (iframe) {
+                iframe.classList.remove('hidden');
+                iframe.src = url;
+            }
+            const banner = document.getElementById('iframeSecurityBanner');
+            if (banner) banner.classList.remove('hidden');
+            showToast('Loading URL in frame...');
+        }
+
+        function renderBlockedSiteGateway(app, embedUrl) {
+            const container = document.getElementById('simulatedAppContainer');
+            let domainName = app.url;
+            try {
+                domainName = new URL(embedUrl).hostname;
+            } catch(e) {}
+
+            container.innerHTML = `
+                <div class="max-w-xl w-full bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl text-center space-y-5 animate-in fade-in zoom-in-95">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr ${app.color} flex items-center justify-center text-white mx-auto shadow-lg text-2xl">
+                        <i class="fa-solid ${app.icon}"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-white mb-1">${app.name}</h2>
+                        <p class="font-mono text-xs text-blue-400 truncate max-w-md mx-auto">${app.url}</p>
+                    </div>
+
+                    <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 text-xs text-slate-300 text-left space-y-2">
+                        <div class="flex items-center space-x-2 text-amber-400 font-semibold">
+                            <i class="fa-solid fa-shield-halved"></i>
+                            <span>Iframe Security Policy Notice</span>
+                        </div>
+                        <p class="text-slate-300 leading-relaxed">
+                            <strong>${domainName}</strong> enforces <code class="bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-mono text-[11px]">X-Frame-Options: SAMEORIGIN</code> to prevent clickjacking, which blocks modern browsers from displaying its full homepage inside an embedded frame.
+                        </p>
+                        <p class="text-slate-400 leading-relaxed text-[11px]">
+                            Internal IP apps (<strong>Proxmox, Portainer, Home Assistant, Pi-hole, NAS, Routers</strong>) and local services work directly in fullscreen. For external sites like Google or YouTube, click below to open directly in a new tab.
+                        </p>
+                    </div>
+
+                    <div class="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                        <button onclick="openInNewTab()" class="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/25 transition-all flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                            <span>Open in New Tab</span>
+                        </button>
+                        <button onclick="forceIframeLoad('${encodeURIComponent(embedUrl)}')" class="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors">
+                            Attempt In-Frame Load
+                        </button>
+                        <button onclick="returnToDashboard()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl text-xs font-semibold transition-colors">
+                            Return to Dashboard
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderLocalFileGateway(app, embedUrl) {
+            const container = document.getElementById('simulatedAppContainer');
+            container.innerHTML = `
+                <div class="max-w-xl w-full bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl text-center space-y-5 animate-in fade-in zoom-in-95">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr ${app.color} flex items-center justify-center text-white mx-auto shadow-lg text-2xl">
+                        <i class="fa-solid ${app.icon}"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-white mb-1">${app.name}</h2>
+                        <p class="font-mono text-xs text-blue-400 truncate max-w-md mx-auto">${app.url}</p>
+                    </div>
+
+                    <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 text-xs text-slate-300 text-left space-y-2">
+                        <div class="flex items-center space-x-2 text-amber-400 font-semibold">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            <span>Chromium Local File Security Policy</span>
+                        </div>
+                        <p class="text-slate-300 leading-relaxed">
+                            You opened MyPortal using a <code class="bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-mono text-[11px]">file:///</code> address. Modern browsers treat <code class="text-amber-300">file:</code> URLs as unique security origins and restrict iframe loading across different folders.
+                        </p>
+                        <p class="text-slate-400 leading-relaxed text-[11px]">
+                            <strong>How to enable fullscreen in-frame embedding:</strong><br>
+                            Double-click <code class="bg-slate-950 px-1.5 py-0.5 rounded text-blue-400 font-mono text-[11px]">start_portal.bat</code> in the Portal folder. This launches the unified gateway at <strong class="text-white">http://localhost:8088</strong>, allowing PSE and all local projects to embed seamlessly!
+                        </p>
+                    </div>
+
+                    <div class="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                        <button onclick="openInNewTab()" class="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/25 transition-all flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                            <span>Open in New Tab</span>
+                        </button>
+                        <button onclick="forceIframeLoad('${encodeURIComponent(embedUrl)}')" class="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors">
+                            Attempt In-Frame Load
+                        </button>
+                        <button onclick="returnToDashboard()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl text-xs font-semibold transition-colors">
+                            Return to Dashboard
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Launch App Inside the Same Page in Fullscreen mode with sticky top-right nav
+        function launchApp(appId) {
+            const app = apps.find(a => a.id === appId);
+            if (!app) return;
+            currentActiveApp = app;
+
+            const embedUrl = getEmbeddableUrl(app.url);
+            const isBlocked = isKnownIframeBlocked(app.url);
+            const isLocal = isLocalFileUrl(app.url);
+            const isFileOrigin = window.location.protocol === 'file:';
+
+            // If configured to open directly in a new tab
+            if (app.launchMode === 'newtab') {
+                window.open(app.url, '_blank');
+                showToast(`Opened ${app.name} in new tab`);
+                return;
+            }
+
+            // Activate fullscreen mode
+            document.body.classList.add('app-fullscreen-mode');
+
+            document.getElementById('dashboardHomeView').classList.add('hidden');
+            document.getElementById('activeAppView').classList.remove('hidden');
+
+            const backBtn = document.getElementById('backToHomeBtn');
+            if (backBtn) {
+                backBtn.classList.remove('hidden');
+                backBtn.classList.add('flex');
+            }
+
+            const headerInfo = document.getElementById('activeAppHeaderInfo');
+            if (headerInfo) {
+                headerInfo.classList.remove('hidden');
+                headerInfo.classList.add('flex');
+            }
+
+            const titleHeader = document.getElementById('activeAppTitleHeader');
+            if (titleHeader) titleHeader.innerText = app.name;
+
+            const ipHeader = document.getElementById('activeAppIpHeader');
+            if (ipHeader) ipHeader.innerText = app.url;
+
+            const ipDisplay = document.getElementById('activeAppIpDisplay');
+            if (ipDisplay) ipDisplay.innerText = app.url;
+
+            const catBadge = document.getElementById('activeAppCategoryBadge');
+            if (catBadge) catBadge.innerText = app.category;
+
+            // Update Sticky Nav Active App Info
+            const stickyName = document.getElementById('stickyActiveAppName');
+            if (stickyName) stickyName.innerText = app.name;
+
+            const stickyIp = document.getElementById('stickyActiveAppIp');
+            if (stickyIp) stickyIp.innerText = app.url;
+
+            const iframe = document.getElementById('serviceIframe');
+            const simulatedContainer = document.getElementById('simulatedAppContainer');
+            const securityBanner = document.getElementById('iframeSecurityBanner');
+            const blockedDomainSpan = document.getElementById('blockedDomainName');
+
+            // Untouched sample apps on dummy local IPs (e.g. 192.168.1.50:9000, 192.168.1.101:8006, 192.168.1.200:8123)
+            const isUntouchedSample = (
+                (app.id === 'portainer' && app.url === 'http://192.168.1.50:9000') ||
+                (app.id === 'proxmox' && app.url === 'http://192.168.1.101:8006') ||
+                (app.id === 'homeassistant' && app.url === 'http://192.168.1.200:8123')
+            );
+
+            if (isUntouchedSample) {
+                if (securityBanner) securityBanner.classList.add('hidden');
+                iframe.classList.add('hidden');
+                simulatedContainer.classList.remove('hidden');
+                renderSimulatedAppContent(app);
+            } else if (isBlocked) {
+                if (securityBanner) {
+                    if (blockedDomainSpan) {
+                        try {
+                            const parsed = new URL(embedUrl);
+                            blockedDomainSpan.innerText = parsed.hostname;
+                        } catch(e) {
+                            blockedDomainSpan.innerText = app.url;
+                        }
+                    }
+                    securityBanner.classList.remove('hidden');
+                }
+                iframe.classList.add('hidden');
+                simulatedContainer.classList.remove('hidden');
+                renderBlockedSiteGateway(app, embedUrl);
+            } else if (isLocal && isFileOrigin && !isLocalServerOnline) {
+                if (securityBanner) securityBanner.classList.add('hidden');
+                iframe.classList.add('hidden');
+                simulatedContainer.classList.remove('hidden');
+                renderLocalFileGateway(app, embedUrl);
+            } else {
+                if (securityBanner) securityBanner.classList.add('hidden');
+                simulatedContainer.classList.add('hidden');
+                iframe.classList.remove('hidden');
+                iframe.src = embedUrl;
+            }
+
+            showToast(`Launched ${app.name} in Fullscreen`);
+        }
+
+        function returnToDashboard() {
+            // Deactivate fullscreen mode
+            document.body.classList.remove('app-fullscreen-mode');
+
+            document.getElementById('activeAppView').classList.add('hidden');
+            document.getElementById('dashboardHomeView').classList.remove('hidden');
+
+            const backBtn = document.getElementById('backToHomeBtn');
+            if (backBtn) {
+                backBtn.classList.add('hidden');
+                backBtn.classList.remove('flex');
+            }
+
+            const headerInfo = document.getElementById('activeAppHeaderInfo');
+            if (headerInfo) {
+                headerInfo.classList.add('hidden');
+                headerInfo.classList.remove('flex');
+            }
+            
+            const iframe = document.getElementById('serviceIframe');
+            if (iframe) iframe.src = 'about:blank';
+
+            const securityBanner = document.getElementById('iframeSecurityBanner');
+            if (securityBanner) securityBanner.classList.add('hidden');
+
+            // Close app drawer if open
+            const drawer = document.getElementById('appGridDrawer');
+            if (drawer && !drawer.classList.contains('hidden')) {
+                toggleAppGridDrawer();
+            }
+
+            currentActiveApp = null;
+        }
+
+        function toggleNativeFullscreen() {
+            const icon = document.getElementById('fullscreenIcon');
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+                if (icon) icon.className = 'fa-solid fa-compress text-xs';
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+                if (icon) icon.className = 'fa-solid fa-expand text-xs';
+            }
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            const icon = document.getElementById('fullscreenIcon');
+            if (!icon) return;
+            if (document.fullscreenElement) {
+                icon.className = 'fa-solid fa-compress text-xs';
+            } else {
+                icon.className = 'fa-solid fa-expand text-xs';
+            }
+        });
+
+        function refreshActiveApp() {
+            if (!currentActiveApp) return;
+            launchApp(currentActiveApp.id);
+            showToast(`Refreshed ${currentActiveApp.name}`);
+        }
+
+        function openInNewTab() {
+            if (!currentActiveApp) return;
+            window.open(currentActiveApp.url, '_blank');
+        }
+
+        function renderSimulatedAppContent(app) {
+            const container = document.getElementById('simulatedAppContainer');
+            if (app.id === 'proxmox' || app.id === 'portainer') {
+                container.innerHTML = `
+                    <div class="max-w-4xl w-full text-left space-y-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h2 class="text-xl font-bold text-white">${app.name} Dashboard</h2>
+                                <p class="text-xs text-slate-400">Connected IP Node: <span class="font-mono text-emerald-400">${app.url}</span></p>
+                            </div>
+                            <span class="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-semibold rounded-full">Node Online</span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+                                <span class="text-xs text-slate-400 block mb-1">CPU Load</span>
+                                <div class="text-2xl font-bold text-white mb-2">18.4%</div>
+                                <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                    <div class="bg-blue-500 h-full w-1/5 rounded-full"></div>
+                                </div>
+                            </div>
+                            <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+                                <span class="text-xs text-slate-400 block mb-1">Memory Allocation</span>
+                                <div class="text-2xl font-bold text-white mb-2">14.2 GB / 32 GB</div>
+                                <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                    <div class="bg-emerald-500 h-full w-2/5 rounded-full"></div>
+                                </div>
+                            </div>
+                            <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+                                <span class="text-xs text-slate-400 block mb-1">Active Containers</span>
+                                <div class="text-2xl font-bold text-white mb-2">24 Services</div>
+                                <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                    <div class="bg-amber-500 h-full w-3/4 rounded-full"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <div class="max-w-xl w-full bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl text-center space-y-4">
+                        <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr ${app.color} flex items-center justify-center text-white mx-auto shadow-lg">
+                            <i class="fa-solid ${app.icon} text-2xl"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold text-white">${app.name}</h2>
+                        <p class="text-sm text-slate-400">Connected to IP endpoint: <span class="font-mono text-blue-400">${app.url}</span></p>
+                        <div class="pt-4 flex items-center justify-center space-x-3">
+                            <button onclick="openInNewTab()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md transition-colors">Open in New Tab</button>
+                            <button onclick="returnToDashboard()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors">Return to Dashboard</button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Populate Category Dropdown
+        function populateCategoryDropdown(selectedVal = '') {
+            const select = document.getElementById('appCategoryInput');
+            select.innerHTML = categories.map(cat => `
+                <option value="${cat}" ${cat === selectedVal ? 'selected' : ''}>${cat}</option>
+            `).join('');
+        }
+
+        // Modal Controls
+        function openAddAppModal() {
+            document.getElementById('appEditId').value = '';
+            document.getElementById('appModalTitle').innerText = 'Add New IP App';
+            document.getElementById('appForm').reset();
+            populateCategoryDropdown();
+            document.getElementById('appLaunchModeInput').value = 'iframe';
+            document.getElementById('appModal').classList.remove('hidden');
+        }
+
+        function openEditAppModal(appId) {
+            const app = apps.find(a => a.id === appId);
+            if (!app) return;
+            document.getElementById('appEditId').value = app.id;
+            document.getElementById('appModalTitle').innerText = 'Edit IP App';
+            document.getElementById('appNameInput').value = app.name;
+            document.getElementById('appUrlInput').value = app.url;
+            document.getElementById('appIconInput').value = app.icon;
+            document.getElementById('appColorInput').value = app.color;
+            document.getElementById('appSectionInput').value = app.section || 'favorite';
+            document.getElementById('appLaunchModeInput').value = app.launchMode || (isKnownIframeBlocked(app.url) ? 'newtab' : 'iframe');
+            document.getElementById('appDescInput').value = app.description || '';
+            populateCategoryDropdown(app.category);
+            document.getElementById('appModal').classList.remove('hidden');
+        }
+
+        function closeAddAppModal() {
+            document.getElementById('appModal').classList.add('hidden');
+            document.getElementById('appForm').reset();
+        }
+
+        function saveCustomApp(e) {
+            e.preventDefault();
+            const editId = document.getElementById('appEditId').value;
+            const rawUrl = normalizeAppUrl(document.getElementById('appUrlInput').value);
+            const launchMode = document.getElementById('appLaunchModeInput').value || 'iframe';
+
+            const appData = {
+                id: editId || ('app-' + Date.now()),
+                name: document.getElementById('appNameInput').value,
+                url: rawUrl,
+                category: document.getElementById('appCategoryInput').value,
+                section: document.getElementById('appSectionInput').value,
+                launchMode: launchMode,
+                icon: document.getElementById('appIconInput').value || 'fa-server',
+                color: document.getElementById('appColorInput').value,
+                description: document.getElementById('appDescInput').value
+            };
+
+            if (editId) {
+                const index = apps.findIndex(a => a.id === editId);
+                if (index !== -1) apps[index] = appData;
+                showToast(`Updated ${appData.name}`);
+            } else {
+                apps.push(appData);
+                showToast(`Added ${appData.name}`);
+            }
+
+            localStorage.setItem('myportal_apps', JSON.stringify(apps));
+            renderCategoryFilterBar();
+            renderDashboardGrid();
+            renderDrawerGrids();
+            closeAddAppModal();
+        }
+
+        function deleteApp(appId) {
+            if (!confirm('Are you sure you want to delete this app?')) return;
+            apps = apps.filter(a => a.id !== appId);
+            localStorage.setItem('myportal_apps', JSON.stringify(apps));
+            renderCategoryFilterBar();
+            renderDashboardGrid();
+            renderDrawerGrids();
+            showToast('App deleted successfully');
+        }
+
+        // Settings Modal & Category Management
+        function openSettingsModal() {
+            renderSettingsCategoryList();
+            document.getElementById('settingsModal').classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+
+        function renderSettingsCategoryList() {
+            const list = document.getElementById('settingsCategoryList');
+            list.innerHTML = categories.map((cat, idx) => `
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm">
+                    <span class="font-medium">${cat}</span>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="renameCategory(${idx})" title="Rename Category" class="w-7 h-7 rounded hover:bg-slate-200 dark:hover:bg-slate-800 flex items-center justify-center text-slate-500 transition-colors">
+                            <i class="fa-solid fa-pen text-xs"></i>
+                        </button>
+                        ${categories.length > 1 ? `
+                            <button onclick="deleteCategory(${idx})" title="Delete Category" class="w-7 h-7 rounded hover:bg-rose-100 dark:hover:bg-rose-950/50 flex items-center justify-center text-rose-500 transition-colors">
+                                <i class="fa-solid fa-trash text-xs"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function addNewCategory(e) {
+            e.preventDefault();
+            const input = document.getElementById('newCategoryName');
+            const name = input.value.trim();
+            if (!name) return;
+
+            if (categories.includes(name)) {
+                showToast('Category already exists');
+                return;
+            }
+
+            categories.push(name);
+            localStorage.setItem('myportal_categories', JSON.stringify(categories));
+            input.value = '';
+            renderSettingsCategoryList();
+            renderCategoryFilterBar();
+            showToast(`Added category "${name}"`);
+        }
+
+        function renameCategory(index) {
+            const oldName = categories[index];
+            const newName = prompt(`Rename category "${oldName}" to:`, oldName);
+            if (!newName || !newName.trim() || newName.trim() === oldName) return;
+
+            const trimmed = newName.trim();
+            if (categories.includes(trimmed)) {
+                showToast('Category already exists');
+                return;
+            }
+
+            categories[index] = trimmed;
+            apps.forEach(app => {
+                if (app.category === oldName) app.category = trimmed;
+            });
+
+            if (selectedCategoryFilter === oldName) selectedCategoryFilter = trimmed;
+
+            localStorage.setItem('myportal_categories', JSON.stringify(categories));
+            localStorage.setItem('myportal_apps', JSON.stringify(apps));
+
+            renderSettingsCategoryList();
+            renderCategoryFilterBar();
+            renderDashboardGrid();
+            showToast(`Renamed category to "${trimmed}"`);
+        }
+
+        function deleteCategory(index) {
+            const catToDelete = categories[index];
+            if (categories.length <= 1) {
+                showToast('At least one category is required');
+                return;
+            }
+
+            const fallbackCategory = categories.find(c => c !== catToDelete);
+            if (!confirm(`Delete category "${catToDelete}"? Apps in this category will be moved to "${fallbackCategory}".`)) return;
+
+            apps.forEach(app => {
+                if (app.category === catToDelete) app.category = fallbackCategory;
+            });
+
+            categories.splice(index, 1);
+            if (selectedCategoryFilter === catToDelete) selectedCategoryFilter = 'All';
+
+            localStorage.setItem('myportal_categories', JSON.stringify(categories));
+            localStorage.setItem('myportal_apps', JSON.stringify(apps));
+
+            renderSettingsCategoryList();
+            renderCategoryFilterBar();
+            renderDashboardGrid();
+            renderDrawerGrids();
+            showToast(`Deleted category "${catToDelete}"`);
+        }
+
+        // Start Empty & Load Sample Apps
+        function startEmptyPortal() {
+            if (!confirm('Start empty? This will clear all apps and reset categories.')) return;
+            apps = [];
+            categories = ['General'];
+            selectedCategoryFilter = 'All';
+
+            localStorage.setItem('myportal_apps', JSON.stringify(apps));
+            localStorage.setItem('myportal_categories', JSON.stringify(categories));
+
+            renderCategoryFilterBar();
+            renderDashboardGrid();
+            renderDrawerGrids();
+            renderSettingsCategoryList();
+            closeSettingsModal();
+            showToast('Portal cleared successfully');
+        }
+
+        function loadSampleApps() {
+            if (!confirm('Load sample apps? This will restore default sample services.')) return;
+            apps = JSON.parse(JSON.stringify(defaultApps));
+            categories = JSON.parse(JSON.stringify(defaultCategories));
+            selectedCategoryFilter = 'All';
+
+            localStorage.setItem('myportal_apps', JSON.stringify(apps));
+            localStorage.setItem('myportal_categories', JSON.stringify(categories));
+
+            renderCategoryFilterBar();
+            renderDashboardGrid();
+            renderDrawerGrids();
+            renderSettingsCategoryList();
+            closeSettingsModal();
+            showToast('Sample apps loaded successfully');
+        }
+
+        // Theme and Toast Utilities
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            const themeIcon = document.getElementById('themeIcon');
+            html.classList.toggle('dark');
+            
+            if (html.classList.contains('dark')) {
+                localStorage.setItem('myportal_theme', 'dark');
+                themeIcon.className = 'fa-solid fa-sun text-sm';
+            } else {
+                localStorage.setItem('myportal_theme', 'light');
+                themeIcon.className = 'fa-solid fa-moon text-sm';
+            }
+        }
+
+        function checkSystemTheme() {
+            const savedTheme = localStorage.getItem('myportal_theme');
+            const themeIcon = document.getElementById('themeIcon');
+            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+                themeIcon.className = 'fa-solid fa-sun text-sm';
+            } else {
+                document.documentElement.classList.remove('dark');
+                themeIcon.className = 'fa-solid fa-moon text-sm';
+            }
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toastNotification');
+            const messageEl = document.getElementById('toastMessage');
+            messageEl.innerText = message;
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
