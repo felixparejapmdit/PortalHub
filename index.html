@@ -80,6 +80,43 @@
         .dark .app-card-hover:hover {
             background-color: rgba(51, 65, 85, 0.5);
         }
+        /* 3D Carousel (Cover Flow) Presentation */
+        .carousel-3d-stage {
+            perspective: 1200px;
+            perspective-origin: 50% 50%;
+            transform-style: preserve-3d;
+            overflow: hidden;
+            position: relative;
+            user-select: none;
+            touch-action: pan-y;
+        }
+        .carousel-3d-card {
+            position: absolute;
+            width: 320px;
+            height: 395px;
+            top: 25px;
+            left: 50%;
+            margin-left: -160px;
+            transform-style: preserve-3d;
+            will-change: transform, opacity, filter, box-shadow;
+            transition: transform 0.52s cubic-bezier(0.2, 0.9, 0.3, 1), opacity 0.52s ease, filter 0.52s ease, box-shadow 0.52s ease;
+            -webkit-box-reflect: below 8px linear-gradient(to bottom, transparent 65%, rgba(0, 0, 0, 0.22) 100%);
+            cursor: pointer;
+        }
+        @media (max-width: 640px) {
+            .carousel-3d-card {
+                width: 270px;
+                height: 360px;
+                top: 20px;
+                margin-left: -135px;
+            }
+        }
+        .carousel-reflection-floor {
+            background: radial-gradient(ellipse at 50% 88%, rgba(59, 130, 246, 0.12) 0%, rgba(226, 232, 240, 0.4) 55%, transparent 80%);
+        }
+        .dark .carousel-reflection-floor {
+            background: radial-gradient(ellipse at 50% 88%, rgba(56, 189, 248, 0.16) 0%, rgba(15, 23, 42, 0.65) 60%, transparent 85%);
+        }
         /* App Fullscreen & Sticky Top-Right Navigation Bar */
         .app-fullscreen-mode {
             overflow: hidden !important;
@@ -562,9 +599,13 @@
                         <div class="flex items-center space-x-2.5">
                             <span id="appCountBadge" class="px-3 py-1 rounded-full bg-slate-200 dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300">0 apps</span>
 
-                            <!-- View Type Toggle: Grid vs Table -->
+                            <!-- View Type Toggle: 3D Carousel vs Grid vs Table -->
                             <div class="flex items-center bg-slate-200/80 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
-                                <button id="viewGridBtn" onclick="setViewType('grid')" title="Grid View" class="flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm">
+                                <button id="viewCarouselBtn" onclick="setViewType('carousel')" title="3D Carousel View" class="flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm">
+                                    <i class="fa-solid fa-layer-group"></i>
+                                    <span class="hidden sm:inline">Carousel</span>
+                                </button>
+                                <button id="viewGridBtn" onclick="setViewType('grid')" title="Grid View" class="flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
                                     <i class="fa-solid fa-table-cells-large"></i>
                                     <span class="hidden sm:inline">Grid</span>
                                 </button>
@@ -582,8 +623,73 @@
                     </div>
                 </div>
 
+                <!-- VIEW 0: 3D Carousel (Cover Flow) View -->
+                <div id="mainAppCarouselWrapper" class="space-y-3">
+                    <!-- Carousel Top Search & Navigation Bar -->
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 px-1">
+                        <div class="relative w-full max-w-md">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+                            <input type="text" id="carouselSearchInput" oninput="handleCarouselSearch(this.value)" placeholder="Search configured services..." class="w-full pl-9 pr-8 py-2 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm transition-all">
+                            <button id="clearCarouselSearchBtn" onclick="clearCarouselSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 text-xs">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                        <div class="hidden sm:flex items-center space-x-2 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                            <span class="px-2.5 py-1 rounded-xl bg-slate-200/60 dark:bg-slate-800/70 border border-slate-300/40 dark:border-slate-700/50">
+                                <i class="fa-solid fa-arrow-left text-[10px] mr-1"></i><i class="fa-solid fa-arrow-right text-[10px]"></i> Arrows
+                            </span>
+                            <span class="px-2.5 py-1 rounded-xl bg-slate-200/60 dark:bg-slate-800/70 border border-slate-300/40 dark:border-slate-700/50">
+                                <i class="fa-solid fa-hand-pointer text-[10px] mr-1"></i> Drag / Click
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- 3D Perspective Stage Container -->
+                    <div id="carousel3dContainer" class="carousel-3d-stage carousel-reflection-floor w-full h-[470px] sm:h-[510px] rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-inner relative flex items-center justify-center overflow-hidden">
+                        <!-- Side Ambient Gradient Vignettes -->
+                        <div class="absolute inset-y-0 left-0 w-16 sm:w-28 bg-gradient-to-r from-slate-100 dark:from-[#070e17] to-transparent z-40 pointer-events-none"></div>
+                        <div class="absolute inset-y-0 right-0 w-16 sm:w-28 bg-gradient-to-l from-slate-100 dark:from-[#070e17] to-transparent z-40 pointer-events-none"></div>
+
+                        <!-- Previous Slide Button -->
+                        <button id="carouselPrevBtn" onclick="prevCarouselSlide()" title="Previous Service (← Arrow)" class="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-50 w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-cyan-400 border border-slate-200/80 dark:border-slate-700 shadow-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md">
+                            <i class="fa-solid fa-chevron-left text-sm"></i>
+                        </button>
+
+                        <!-- Next Slide Button -->
+                        <button id="carouselNextBtn" onclick="nextCarouselSlide()" title="Next Service (→ Arrow)" class="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-50 w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-cyan-400 border border-slate-200/80 dark:border-slate-700 shadow-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md">
+                            <i class="fa-solid fa-chevron-right text-sm"></i>
+                        </button>
+
+                        <!-- 3D Cards Track -->
+                        <div id="carouselCardsTrack" class="w-full h-full relative" style="transform-style: preserve-3d;">
+                            <!-- Dynamically populated 3D Cards -->
+                        </div>
+                    </div>
+
+                    <!-- Bottom Indicator and Status Bar -->
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-2.5 px-4 py-2.5 bg-white/80 dark:bg-slate-800/80 rounded-2xl border border-slate-200/70 dark:border-slate-700/60 shadow-sm text-xs">
+                        <div class="flex items-center space-x-2 text-slate-600 dark:text-slate-300 font-medium">
+                            <span id="carouselActiveCounter" class="font-bold text-blue-600 dark:text-blue-400">Service 1 of 7</span>
+                            <span class="text-slate-300 dark:text-slate-600">•</span>
+                            <span id="carouselActiveCategory" class="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700/80 text-[11px] font-semibold text-slate-700 dark:text-slate-200">Finance</span>
+                        </div>
+
+                        <!-- Dots / Indicator Pills -->
+                        <div id="carouselIndicatorDots" class="flex items-center space-x-1.5 overflow-x-auto max-w-full py-1">
+                            <!-- Populated dynamically -->
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+                            <button onclick="openAddAppModal()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center space-x-1.5">
+                                <i class="fa-solid fa-plus text-[10px]"></i>
+                                <span>Add App</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- VIEW A: App Cards Grid -->
-                <div id="mainAppGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-5">
+                <div id="mainAppGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-5">
                     <!-- Populated dynamically -->
                 </div>
 
@@ -980,7 +1086,7 @@
     </div>
 
     <script>
-        const defaultCategories = ['Finance', 'Tools', 'Dashboard'];
+        const defaultCategories = ['Finance', 'Servers & Cloud', 'Smart Home', 'Dashboard', 'Tools', 'Productivity'];
         
         const defaultApps = [
             {
@@ -993,6 +1099,72 @@
                 color: 'from-emerald-500 to-teal-600',
                 launchMode: 'iframe',
                 description: 'PSE portfolio tracker and savings management application.'
+            },
+            {
+                id: 'homeassistant',
+                name: 'Home Assistant',
+                url: 'http://homeassistant.local:8123',
+                category: 'Smart Home',
+                section: 'favorite',
+                icon: 'fa-house-signal',
+                color: 'from-sky-500 to-blue-600',
+                launchMode: 'iframe',
+                description: 'Unified smart home automation controller and IoT device manager.'
+            },
+            {
+                id: 'proxmox',
+                name: 'Proxmox VE',
+                url: 'https://192.168.1.100:8006',
+                category: 'Servers & Cloud',
+                section: 'favorite',
+                icon: 'fa-server',
+                color: 'from-orange-500 to-amber-600',
+                launchMode: 'newtab',
+                description: 'Enterprise virtualization platform for virtual machines and LXC containers.'
+            },
+            {
+                id: 'portainer',
+                name: 'Portainer CE',
+                url: 'http://192.168.1.105:9000',
+                category: 'Servers & Cloud',
+                section: 'favorite',
+                icon: 'fa-cubes',
+                color: 'from-blue-600 to-cyan-500',
+                launchMode: 'iframe',
+                description: 'Centralized Docker container management and swarm orchestration.'
+            },
+            {
+                id: 'grafana',
+                name: 'Grafana Dashboard',
+                url: 'http://192.168.1.110:3000',
+                category: 'Dashboard',
+                section: 'secondary',
+                icon: 'fa-chart-line',
+                color: 'from-amber-500 to-red-500',
+                launchMode: 'iframe',
+                description: 'Real-time telemetry, server metrics, network load, and observability analytics.'
+            },
+            {
+                id: 'nextcloud',
+                name: 'Nextcloud Hub',
+                url: 'http://192.168.1.120:8080',
+                category: 'Productivity',
+                section: 'secondary',
+                icon: 'fa-cloud',
+                color: 'from-indigo-500 to-purple-600',
+                launchMode: 'iframe',
+                description: 'Self-hosted private cloud storage, file sharing, calendar, and collaboration.'
+            },
+            {
+                id: 'pihole',
+                name: 'Pi-hole Admin',
+                url: 'http://192.168.1.2:80/admin',
+                category: 'Tools',
+                section: 'secondary',
+                icon: 'fa-shield-halved',
+                color: 'from-rose-500 to-pink-600',
+                launchMode: 'iframe',
+                description: 'Network-wide ad-blocking and DNS sinkhole security gateway.'
             }
         ];
 
@@ -1000,42 +1172,67 @@
         let apps = JSON.parse(localStorage.getItem('myportal_apps')) || defaultApps;
         let currentActiveApp = null;
         let selectedCategoryFilter = 'All';
-        let currentViewType = localStorage.getItem('myportal_view_type') || 'grid';
+
+        // 3D Carousel is now the primary default view
+        const storedView = localStorage.getItem('myportal_view_type');
+        const hasV2Pref = localStorage.getItem('myportal_view_type_v2');
+        let currentViewType = hasV2Pref ? (storedView || 'carousel') : 'carousel';
+        if (!hasV2Pref) {
+            localStorage.setItem('myportal_view_type', 'carousel');
+            localStorage.setItem('myportal_view_type_v2', 'true');
+        }
+
         const TABLE_PAGE_SIZE = 15;
         let tableCurrentPage = 1;
+
+        // 3D Carousel Navigation State
+        let carouselActiveIndex = 0;
+        let carouselSearchQuery = '';
 
         function setViewType(type) {
             currentViewType = type;
             localStorage.setItem('myportal_view_type', type);
+            localStorage.setItem('myportal_view_type_v2', 'true');
             updateViewTypeUI();
             renderDashboardGrid();
         }
 
         function updateViewTypeUI() {
+            const carouselBtn = document.getElementById('viewCarouselBtn');
             const gridBtn = document.getElementById('viewGridBtn');
             const tableBtn = document.getElementById('viewTableBtn');
+            const carouselWrapper = document.getElementById('mainAppCarouselWrapper');
             const gridEl = document.getElementById('mainAppGrid');
             const tableWrapper = document.getElementById('mainAppTableWrapper');
 
-            if (currentViewType === 'grid') {
-                if (gridBtn) {
-                    gridBtn.className = 'flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm';
-                }
-                if (tableBtn) {
-                    tableBtn.className = 'flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white';
-                }
-                if (gridEl) gridEl.classList.remove('hidden');
-                if (tableWrapper) tableWrapper.classList.add('hidden');
-            } else {
-                if (gridBtn) {
-                    gridBtn.className = 'flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white';
-                }
-                if (tableBtn) {
-                    tableBtn.className = 'flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm';
-                }
-                if (gridEl) gridEl.classList.add('hidden');
-                if (tableWrapper) tableWrapper.classList.remove('hidden');
-            }
+            const activeBtn = 'flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm';
+            const inactiveBtn = 'flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white';
+
+            if (carouselBtn) carouselBtn.className = currentViewType === 'carousel' ? activeBtn : inactiveBtn;
+            if (gridBtn) gridBtn.className = currentViewType === 'grid' ? activeBtn : inactiveBtn;
+            if (tableBtn) tableBtn.className = currentViewType === 'table' ? activeBtn : inactiveBtn;
+
+            if (carouselWrapper) carouselWrapper.classList.toggle('hidden', currentViewType !== 'carousel');
+            if (gridEl) gridEl.classList.toggle('hidden', currentViewType !== 'grid');
+            if (tableWrapper) tableWrapper.classList.toggle('hidden', currentViewType !== 'table');
+        }
+
+        function handleCarouselSearch(val) {
+            carouselSearchQuery = val || '';
+            const clearBtn = document.getElementById('clearCarouselSearchBtn');
+            if (clearBtn) clearBtn.classList.toggle('hidden', !carouselSearchQuery);
+            carouselActiveIndex = 0;
+            renderDashboardGrid();
+        }
+
+        function clearCarouselSearch() {
+            carouselSearchQuery = '';
+            const input = document.getElementById('carouselSearchInput');
+            if (input) input.value = '';
+            const clearBtn = document.getElementById('clearCarouselSearchBtn');
+            if (clearBtn) clearBtn.classList.add('hidden');
+            carouselActiveIndex = 0;
+            renderDashboardGrid();
         }
 
         
@@ -2011,31 +2208,19 @@
             updateAuthUI();
             setupCrossTabSyncAndAutoRefresh();
 
-            // Migration: Purge legacy dummy sample apps and ensure Ipon is set as default sample app
-            const legacySampleIds = ['pse-local', 'portainer', 'proxmox', 'homeassistant', 'nas-storage', 'grafana', 'jenkins', 'search-engine', 'calendar-app', 'news-portal'];
-            const hasLegacySamples = apps.some(a => legacySampleIds.includes(a.id));
-            const hasIpon = apps.some(a => a.id === 'ipon');
-            
-            if (hasLegacySamples || !hasIpon) {
-                // Filter out legacy sample apps
-                apps = apps.filter(a => !legacySampleIds.includes(a.id));
-                // Add Ipon if not already present
-                if (!apps.some(a => a.id === 'ipon')) {
-                    apps.unshift(JSON.parse(JSON.stringify(defaultApps[0])));
+            // Sample Apps Sync: Ensure default apps (Ipon + 6 additional sample apps) and default categories are available
+            defaultApps.forEach(sampleApp => {
+                if (!apps.some(a => a.id === sampleApp.id)) {
+                    apps.push(JSON.parse(JSON.stringify(sampleApp)));
                 }
-                // Ensure Finance category is present
-                if (!categories.includes('Finance')) {
-                    categories.unshift('Finance');
+            });
+            defaultCategories.forEach(cat => {
+                if (!categories.includes(cat)) {
+                    categories.push(cat);
                 }
-                // Filter out categories that belonged exclusively to removed sample apps if user hasn't added custom ones
-                const oldDefaultCats = ['Server', 'Storage', 'Analytics', 'Database'];
-                const appsCategories = new Set(apps.map(a => a.category));
-                categories = categories.filter(c => appsCategories.has(c) || defaultCategories.includes(c) || !oldDefaultCats.includes(c));
-                if (categories.length === 0) categories = [...defaultCategories];
-
-                localStorage.setItem('myportal_apps', JSON.stringify(apps));
-                localStorage.setItem('myportal_categories', JSON.stringify(categories));
-            }
+            });
+            localStorage.setItem('myportal_apps', JSON.stringify(apps));
+            localStorage.setItem('myportal_categories', JSON.stringify(categories));
 
             // Auto-heal any previously stored URLs corrupted with https://file:///
             let hasChanges = false;
@@ -2051,6 +2236,7 @@
             }
 
             updateViewTypeUI();
+            setupCarouselEventListeners();
             renderCategoryFilterBar();
             renderDashboardGrid();
             renderDrawerGrids();
@@ -2114,17 +2300,300 @@
             renderDashboardGrid();
         }
 
+        function getFilteredDashboardApps() {
+            let filtered = selectedCategoryFilter === 'All' 
+                ? apps 
+                : apps.filter(a => a.category === selectedCategoryFilter);
+
+            if (carouselSearchQuery && carouselSearchQuery.trim()) {
+                const q = carouselSearchQuery.trim().toLowerCase();
+                filtered = filtered.filter(a => 
+                    (a.name && a.name.toLowerCase().includes(q)) ||
+                    (a.url && a.url.toLowerCase().includes(q)) ||
+                    (a.category && a.category.toLowerCase().includes(q)) ||
+                    (a.description && a.description.toLowerCase().includes(q))
+                );
+            }
+            return filtered;
+        }
+
+        function prevCarouselSlide() {
+            const filteredApps = getFilteredDashboardApps();
+            if (filteredApps.length === 0) return;
+            if (carouselActiveIndex > 0) {
+                carouselActiveIndex--;
+            } else {
+                carouselActiveIndex = filteredApps.length - 1;
+            }
+            updateCarouselCardsTransform(filteredApps);
+        }
+
+        function nextCarouselSlide() {
+            const filteredApps = getFilteredDashboardApps();
+            if (filteredApps.length === 0) return;
+            if (carouselActiveIndex < filteredApps.length - 1) {
+                carouselActiveIndex++;
+            } else {
+                carouselActiveIndex = 0;
+            }
+            updateCarouselCardsTransform(filteredApps);
+        }
+
+        function selectCarouselIndex(idx) {
+            const filteredApps = getFilteredDashboardApps();
+            if (idx >= 0 && idx < filteredApps.length) {
+                carouselActiveIndex = idx;
+                updateCarouselCardsTransform(filteredApps);
+            }
+        }
+
+        function handleCarouselCardClick(idx) {
+            if (idx !== carouselActiveIndex) {
+                selectCarouselIndex(idx);
+            }
+        }
+
+        function renderCarouselView(filteredApps) {
+            const track = document.getElementById('carouselCardsTrack');
+            const counterEl = document.getElementById('carouselActiveCounter');
+            const catEl = document.getElementById('carouselActiveCategory');
+            const dotsContainer = document.getElementById('carouselIndicatorDots');
+            if (!track) return;
+
+            if (filteredApps.length === 0) {
+                track.innerHTML = `
+                    <div class="w-full h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
+                        <div class="w-16 h-16 rounded-3xl bg-slate-200/80 dark:bg-slate-800/80 flex items-center justify-center mb-3">
+                            <i class="fa-solid fa-layer-group text-2xl text-slate-400"></i>
+                        </div>
+                        <h4 class="font-bold text-base text-slate-800 dark:text-slate-100 mb-1">No services found</h4>
+                        <p class="text-xs text-slate-500 max-w-sm mb-4">No services match your active search or category filter.</p>
+                        <button onclick="clearCarouselSearch(); openAddAppModal();" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md cursor-pointer transition-all">Add Service</button>
+                    </div>
+                `;
+                if (counterEl) counterEl.innerText = '0 services';
+                if (catEl) catEl.innerText = 'None';
+                if (dotsContainer) dotsContainer.innerHTML = '';
+                return;
+            }
+
+            if (carouselActiveIndex >= filteredApps.length) carouselActiveIndex = filteredApps.length - 1;
+            if (carouselActiveIndex < 0) carouselActiveIndex = 0;
+
+            track.innerHTML = filteredApps.map((app, i) => `
+                <div id="carousel-card-${i}" data-index="${i}" onclick="handleCarouselCardClick(${i})" class="carousel-3d-card group">
+                    <div class="h-full bg-white dark:bg-slate-800/95 border border-slate-200/90 dark:border-slate-700/80 rounded-3xl p-5 shadow-xl flex flex-col justify-between relative overflow-hidden backdrop-blur-sm transition-colors">
+                        <div class="absolute top-0 right-0 w-36 h-36 bg-gradient-to-br ${app.color} opacity-10 rounded-bl-full pointer-events-none"></div>
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center space-x-1.5">
+                                    <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300">
+                                        ${app.category}
+                                    </span>
+                                    <span class="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        <span>Live</span>
+                                    </span>
+                                </div>
+                                <div class="flex items-center space-x-1" onclick="event.stopPropagation()">
+                                    <button onclick="event.stopPropagation(); openEditAppModal('${app.id}')" title="Edit App" class="w-7 h-7 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer">
+                                        <i class="fa-solid fa-pen text-xs"></i>
+                                    </button>
+                                    <button onclick="event.stopPropagation(); deleteApp('${app.id}')" title="Delete App" class="w-7 h-7 rounded-full hover:bg-rose-100 dark:hover:bg-rose-950/50 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors cursor-pointer">
+                                        <i class="fa-solid fa-trash text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-col items-center text-center my-3">
+                                <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr ${app.color} flex items-center justify-center text-white shadow-lg shadow-blue-500/20 mb-3 group-hover:scale-105 transition-transform">
+                                    <i class="fa-solid ${app.icon} text-2xl sm:text-3xl"></i>
+                                </div>
+                                <h4 class="font-bold text-lg sm:text-xl text-slate-800 dark:text-slate-100 tracking-tight mb-1">${app.name}</h4>
+                                <span class="font-mono text-xs text-slate-400 dark:text-slate-500 truncate max-w-[240px] block mb-2" title="${app.url}">${app.url}</span>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed px-2">${app.description || 'No description provided.'}</p>
+                            </div>
+                        </div>
+
+                        <div class="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between gap-2" onclick="event.stopPropagation()">
+                            <button onclick="event.stopPropagation(); launchApp('${app.id}')" class="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center justify-center space-x-1.5 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
+                                <i class="fa-solid fa-play text-[10px]"></i>
+                                <span>Launch Service</span>
+                            </button>
+                            <button onclick="event.stopPropagation(); window.open('${app.url}', '_blank')" title="Open in New Tab" class="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/70 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-200 flex items-center justify-center transition-all hover:scale-105 cursor-pointer">
+                                <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            if (dotsContainer) {
+                dotsContainer.innerHTML = filteredApps.map((a, i) => `
+                    <button onclick="selectCarouselIndex(${i})" title="${a.name}" class="cursor-pointer transition-all duration-300 ${i === carouselActiveIndex ? 'w-7 h-2.5 bg-blue-600 dark:bg-cyan-400 rounded-full shadow-sm shadow-blue-500/30' : 'w-2.5 h-2.5 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600 rounded-full'}"></button>
+                `).join('');
+            }
+
+            updateCarouselCardsTransform(filteredApps);
+        }
+
+        function updateCarouselCardsTransform(filteredApps) {
+            if (!filteredApps) filteredApps = getFilteredDashboardApps();
+            if (filteredApps.length === 0) return;
+
+            if (carouselActiveIndex >= filteredApps.length) carouselActiveIndex = filteredApps.length - 1;
+            if (carouselActiveIndex < 0) carouselActiveIndex = 0;
+
+            const counterEl = document.getElementById('carouselActiveCounter');
+            if (counterEl) counterEl.innerText = `Service ${carouselActiveIndex + 1} of ${filteredApps.length}`;
+
+            const catEl = document.getElementById('carouselActiveCategory');
+            if (catEl && filteredApps[carouselActiveIndex]) {
+                catEl.innerText = filteredApps[carouselActiveIndex].category;
+            }
+
+            const dotsContainer = document.getElementById('carouselIndicatorDots');
+            if (dotsContainer) {
+                Array.from(dotsContainer.children).forEach((dot, idx) => {
+                    const isActive = idx === carouselActiveIndex;
+                    dot.className = `cursor-pointer transition-all duration-300 ${isActive ? 'w-7 h-2.5 bg-blue-600 dark:bg-cyan-400 rounded-full shadow-sm shadow-blue-500/30' : 'w-2.5 h-2.5 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600 rounded-full'}`;
+                });
+            }
+
+            const track = document.getElementById('carouselCardsTrack');
+            if (!track) return;
+            const cardEls = track.querySelectorAll('.carousel-3d-card');
+            cardEls.forEach(card => {
+                const idx = parseInt(card.getAttribute('data-index'), 10);
+                const offset = idx - carouselActiveIndex;
+                const absOffset = Math.abs(offset);
+
+                let transform = '';
+                let zIndex = 40 - absOffset;
+                let opacity = 1;
+                let brightness = 1;
+
+                if (offset === 0) {
+                    // Center active card: facing viewer, elevated, deep shadow
+                    transform = 'translateX(0px) translateZ(80px) rotateY(0deg) scale(1.04)';
+                    zIndex = 60;
+                    opacity = 1;
+                    card.style.filter = 'drop-shadow(0 25px 25px rgba(0,0,0,0.3)) brightness(1)';
+                } else if (offset < 0) {
+                    // Left cards
+                    const shiftX = (offset * 165) - 80;
+                    const shiftZ = -100 - (absOffset * 50);
+                    const scale = Math.max(0.65, 1 - (absOffset * 0.08));
+                    transform = `translateX(${shiftX}px) translateZ(${shiftZ}px) rotateY(42deg) scale(${scale})`;
+                    opacity = Math.max(0.16, 1 - (absOffset * 0.22));
+                    brightness = Math.max(0.42, 1 - (absOffset * 0.16));
+                    card.style.filter = `brightness(${brightness})`;
+                } else {
+                    // Right cards
+                    const shiftX = (offset * 165) + 80;
+                    const shiftZ = -100 - (absOffset * 50);
+                    const scale = Math.max(0.65, 1 - (absOffset * 0.08));
+                    transform = `translateX(${shiftX}px) translateZ(${shiftZ}px) rotateY(-42deg) scale(${scale})`;
+                    opacity = Math.max(0.16, 1 - (absOffset * 0.22));
+                    brightness = Math.max(0.42, 1 - (absOffset * 0.16));
+                    card.style.filter = `brightness(${brightness})`;
+                }
+
+                card.style.transform = transform;
+                card.style.zIndex = zIndex;
+                card.style.opacity = opacity;
+            });
+        }
+
+        let carouselEventsBound = false;
+        function setupCarouselEventListeners() {
+            if (carouselEventsBound) return;
+            const stage = document.getElementById('carousel3dContainer');
+            if (!stage) return;
+            carouselEventsBound = true;
+
+            let isPointerDown = false;
+            let startX = 0;
+            let deltaX = 0;
+
+            stage.addEventListener('pointerdown', (e) => {
+                if (e.target.closest('button') || e.target.closest('a')) return;
+                isPointerDown = true;
+                startX = e.clientX;
+                deltaX = 0;
+            });
+
+            stage.addEventListener('pointermove', (e) => {
+                if (!isPointerDown) return;
+                deltaX = e.clientX - startX;
+            });
+
+            const handlePointerEnd = () => {
+                if (!isPointerDown) return;
+                isPointerDown = false;
+                if (deltaX < -40) {
+                    nextCarouselSlide();
+                } else if (deltaX > 40) {
+                    prevCarouselSlide();
+                }
+                deltaX = 0;
+            };
+
+            stage.addEventListener('pointerup', handlePointerEnd);
+            stage.addEventListener('pointercancel', handlePointerEnd);
+
+            // Smooth Wheel Navigation
+            let wheelTimer = null;
+            stage.addEventListener('wheel', (e) => {
+                const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+                if (Math.abs(delta) > 12) {
+                    e.preventDefault();
+                    if (wheelTimer) return;
+                    if (delta > 0) {
+                        nextCarouselSlide();
+                    } else {
+                        prevCarouselSlide();
+                    }
+                    wheelTimer = setTimeout(() => { wheelTimer = null; }, 240);
+                }
+            }, { passive: false });
+
+            // Keyboard navigation (ArrowLeft / ArrowRight)
+            window.addEventListener('keydown', (e) => {
+                if (currentViewType !== 'carousel') return;
+                const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+                if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+                
+                const anyModalOpen = document.querySelector('#accessRequestsModal:not(.hidden), #addAppModal:not(.hidden), #settingsModal:not(.hidden), #demoFamilySignInModal:not(.hidden), #appGridDrawer:not(.hidden)');
+                if (anyModalOpen) return;
+
+                if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    prevCarouselSlide();
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    nextCarouselSlide();
+                } else if (e.key === 'Enter') {
+                    const filteredApps = getFilteredDashboardApps();
+                    if (filteredApps[carouselActiveIndex]) {
+                        launchApp(filteredApps[carouselActiveIndex].id);
+                    }
+                }
+            });
+        }
+
         // Render Dashboard App Cards & Table
         function renderDashboardGrid() {
             const grid = document.getElementById('mainAppGrid');
             const tableBody = document.getElementById('mainAppTableBody');
             const countBadge = document.getElementById('appCountBadge');
             
-            const filteredApps = selectedCategoryFilter === 'All' 
-                ? apps 
-                : apps.filter(a => a.category === selectedCategoryFilter);
+            const filteredApps = getFilteredDashboardApps();
 
             countBadge.innerText = `${filteredApps.length} apps`;
+
+            // Always render 3D Carousel View
+            renderCarouselView(filteredApps);
 
             if (filteredApps.length === 0) {
                 const emptyHtml = `
