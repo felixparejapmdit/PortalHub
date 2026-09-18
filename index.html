@@ -95,25 +95,63 @@
         .app-fullscreen-mode #appSubHeader {
             display: none !important;
         }
+        /* App Mode: Middle-Right Collapsible Floating Dock */
         .app-fullscreen-mode #topRightNav {
             position: fixed !important;
-            top: 0.875rem !important;
-            right: 1rem !important;
+            top: 50% !important;
+            right: 0 !important;
+            transform: translateY(-50%) !important;
             z-index: 50 !important;
             pointer-events: auto !important;
-            background-color: rgba(255, 255, 255, 0.92);
+            background-color: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(226, 232, 240, 0.9);
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-            border-radius: 1.25rem;
-            padding: 0.35rem 0.6rem;
-            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            border-right: none !important;
+            box-shadow: -4px 10px 30px rgba(0, 0, 0, 0.18);
+            border-radius: 1.5rem 0 0 1.5rem;
+            padding: 0.4rem 0.55rem;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex !important;
+            align-items: center;
+            gap: 0.35rem;
         }
         .dark .app-fullscreen-mode #topRightNav {
-            background-color: rgba(15, 23, 42, 0.92);
+            background-color: rgba(15, 23, 42, 0.95);
             border-color: rgba(51, 65, 85, 0.9);
-            box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.5), 0 8px 12px -6px rgba(0, 0, 0, 0.3);
+            box-shadow: -4px 12px 35px rgba(0, 0, 0, 0.55);
+        }
+        /* Collapsed State for Middle-Right Dock */
+        .app-fullscreen-mode #topRightNav.dock-collapsed {
+            padding: 0.35rem 0.45rem !important;
+            border-radius: 1.25rem 0 0 1.25rem !important;
+            opacity: 0.9;
+        }
+        .app-fullscreen-mode #topRightNav.dock-collapsed:hover {
+            opacity: 1;
+            box-shadow: -6px 14px 35px rgba(0, 0, 0, 0.35);
+        }
+        .app-fullscreen-mode #topRightNav.dock-collapsed .app-dock-item {
+            display: none !important;
+        }
+        .app-fullscreen-mode #topRightNav:not(.dock-collapsed) #appDockToggleChevron {
+            transform: rotate(180deg);
+        }
+        /* App Switcher Popover from Middle-Right Dock */
+        .app-fullscreen-mode #appGridDrawer {
+            position: absolute !important;
+            right: calc(100% + 0.6rem) !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            margin-top: 0 !important;
+            transform-origin: center right !important;
+            max-height: 85vh !important;
+            overflow-y: auto !important;
+        }
+        /* When an app is active: hide bottom actions (+Magdagdag ng App, Buong Dashboard) and edit button */
+        .app-fullscreen-mode #drawerBottomActions,
+        .app-fullscreen-mode #drawerEditBtn {
+            display: none !important;
         }
         /* Mode visibility rules */
         .app-fullscreen-mode .dashboard-only-nav {
@@ -161,34 +199,41 @@
             <span id="activeAppIpHeader" class="text-slate-400 dark:text-slate-500 font-mono text-[11px] pl-1.5 border-l border-blue-200 dark:border-blue-800"></span>
         </div>
 
-        <!-- Right: Actions & Google App Launcher Grid (Becomes Sticky Floating Bar in Fullscreen) -->
+        <!-- Right: Actions & Google App Launcher Grid (Becomes Middle-Right Collapsible Dock in Fullscreen) -->
         <div id="topRightNav" class="flex items-center space-x-1.5 sm:space-x-2.5">
             
+            <!-- APP MODE ONLY: Middle-Right Collapsible Dock Toggle Handle -->
+            <button id="appDockToggleBtn" onclick="toggleAppDockCollapse()" title="Toggle PortalHub Menu" class="app-only-nav items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/25 transition-all cursor-pointer flex-shrink-0 select-none">
+                <i class="fa-solid fa-network-wired text-xs"></i>
+                <i id="appDockToggleChevron" class="fa-solid fa-chevron-left text-[10px] transition-transform duration-300"></i>
+                <span class="text-[11px] font-bold tracking-tight hidden sm:inline" id="appDockExpandedText">Portal</span>
+            </button>
+
             <!-- APP MODE ONLY: Active App Info Pill -->
-            <div id="stickyAppInfo" class="app-only-nav items-center space-x-2 px-2.5 py-1 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 border border-slate-200/60 dark:border-slate-700/60 max-w-[150px] sm:max-w-[220px]">
+            <div id="stickyAppInfo" class="app-only-nav app-dock-item items-center space-x-2 px-2.5 py-1 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 border border-slate-200/60 dark:border-slate-700/60 max-w-[150px] sm:max-w-[220px]">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
                 <span id="stickyActiveAppName" class="truncate font-bold">Active App</span>
                 <span id="stickyActiveAppIp" class="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate hidden lg:inline border-l border-slate-200 dark:border-slate-700 pl-1.5"></span>
             </div>
 
             <!-- APP MODE ONLY: Quick Return to Dashboard -->
-            <button onclick="returnToDashboard()" title="Return to Dashboard" class="app-only-nav items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium transition-colors border border-slate-200/60 dark:border-slate-700/60">
+            <button onclick="returnToDashboard()" title="Return to Dashboard" class="app-only-nav app-dock-item items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium transition-colors border border-slate-200/60 dark:border-slate-700/60">
                 <i class="fa-solid fa-arrow-left"></i>
                 <span class="hidden sm:inline">Dashboard</span>
             </button>
 
             <!-- APP MODE ONLY: Reload Active App -->
-            <button onclick="refreshActiveApp()" title="Reload App" class="app-only-nav w-8 h-8 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 items-center justify-center transition-colors">
+            <button onclick="refreshActiveApp()" title="Reload App" class="app-only-nav app-dock-item w-8 h-8 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 items-center justify-center transition-colors">
                 <i class="fa-solid fa-rotate-right text-xs"></i>
             </button>
 
             <!-- APP MODE ONLY: Popout Active App to new tab -->
-            <button onclick="openInNewTab()" title="Open in New Tab" class="app-only-nav w-8 h-8 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 items-center justify-center transition-colors">
+            <button onclick="openInNewTab()" title="Open in New Tab" class="app-only-nav app-dock-item w-8 h-8 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 items-center justify-center transition-colors">
                 <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
             </button>
 
             <!-- APP MODE ONLY: Native Browser Fullscreen Toggle -->
-            <button onclick="toggleNativeFullscreen()" title="Toggle Browser Fullscreen" class="app-only-nav w-8 h-8 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 items-center justify-center transition-colors">
+            <button onclick="toggleNativeFullscreen()" title="Toggle Browser Fullscreen" class="app-only-nav app-dock-item w-8 h-8 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 items-center justify-center transition-colors">
                 <i id="fullscreenIcon" class="fa-solid fa-expand text-xs"></i>
             </button>
 
@@ -199,7 +244,7 @@
             </button>
 
             <!-- BOTH MODES: Theme Toggle -->
-            <button onclick="toggleDarkMode()" title="Toggle Theme" class="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors">
+            <button onclick="toggleDarkMode()" title="Toggle Theme" class="app-dock-item w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors">
                 <i id="themeIcon" class="fa-solid fa-moon text-sm"></i>
             </button>
 
@@ -209,7 +254,7 @@
             </button>
 
             <!-- BOTH MODES: Google Style 3x3 App Grid Launcher (App Switcher Menu) -->
-            <div class="relative">
+            <div class="relative app-dock-item">
                 <button id="appGridToggle" onclick="toggleAppGridDrawer()" title="Google App Launcher / Switcher" class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-md shadow-blue-500/25 transition-all hover:scale-105">
                     <i class="fa-solid fa-grip text-sm sm:text-base"></i>
                 </button>
@@ -220,7 +265,7 @@
                     <!-- Top section of popover -->
                     <div class="flex items-center justify-between mb-3 px-1">
                         <span class="text-sm font-bold text-slate-800 dark:text-slate-100 tracking-tight">Mga paborito mo</span>
-                        <button type="button" onclick="closeAppGridDrawer(); openSettingsModal();" title="Edit Apps" class="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-100 flex items-center justify-center transition-colors cursor-pointer">
+                        <button id="drawerEditBtn" type="button" onclick="closeAppGridDrawer(); openSettingsModal();" title="Edit Apps" class="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-100 flex items-center justify-center transition-colors cursor-pointer">
                             <i class="fa-solid fa-pen text-xs"></i>
                         </button>
                     </div>
@@ -241,7 +286,7 @@
                     </div>
 
                     <!-- Bottom Action Links matching reference image -->
-                    <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-xs font-medium">
+                    <div id="drawerBottomActions" class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-xs font-medium">
                         <button type="button" onclick="closeAppGridDrawer(); openAddAppModal();" class="text-blue-600 dark:text-blue-400 hover:underline flex items-center space-x-1.5 cursor-pointer py-1">
                             <i class="fa-solid fa-plus"></i>
                             <span>Magdagdag ng App</span>
@@ -255,7 +300,7 @@
             </div>
 
             <!-- APP MODE ONLY: Quick Close/Exit Button -->
-            <button onclick="returnToDashboard()" title="Exit App" class="app-only-nav w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 items-center justify-center transition-colors">
+            <button onclick="returnToDashboard()" title="Exit App" class="app-only-nav app-dock-item w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 items-center justify-center transition-colors">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
 
@@ -647,7 +692,43 @@
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Icon (FontAwesome)</label>
-                        <input type="text" id="appIconInput" value="fa-server" placeholder="fa-server" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="relative" id="iconPickerWrapper">
+                            <input type="hidden" id="appIconInput" value="fa-server">
+                            <button type="button" id="iconPickerTrigger" onclick="toggleIconPickerDropdown()" class="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-left transition-all hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
+                                <div class="flex items-center space-x-2.5 truncate">
+                                    <span id="selectedIconBadge" class="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 shadow-sm">
+                                        <i id="selectedIconPreview" class="fa-solid fa-server text-sm"></i>
+                                    </span>
+                                    <span id="selectedIconLabel" class="text-xs font-mono font-medium text-slate-700 dark:text-slate-200 truncate">fa-server</span>
+                                </div>
+                                <i id="iconPickerChevron" class="fa-solid fa-chevron-down text-xs text-slate-400 shrink-0 ml-2 transition-transform"></i>
+                            </button>
+
+                            <!-- Searchable Icon Picker Popover -->
+                            <div id="iconPickerDropdown" class="hidden absolute left-0 right-0 mt-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-[70] p-3 space-y-2 max-h-72 flex flex-col animate-in fade-in zoom-in-95">
+                                <!-- Search Bar -->
+                                <div class="relative shrink-0">
+                                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+                                    <input type="text" id="iconSearchInput" oninput="filterIconPickerList(this.value)" placeholder="Search icons (e.g. server, chart, pig)..." class="w-full pl-8 pr-3 py-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                </div>
+
+                                <div class="flex items-center justify-between text-[10px] text-slate-400 shrink-0 px-0.5">
+                                    <span id="iconPickerCount">Loading icons...</span>
+                                    <span class="text-blue-600 dark:text-blue-400 font-mono font-semibold">FontAwesome 6</span>
+                                </div>
+
+                                <!-- Scrollable List -->
+                                <div id="iconPickerGrid" class="flex-1 overflow-y-auto space-y-1 pr-1 max-h-40 scrollbar-thin">
+                                    <!-- Populated dynamically -->
+                                </div>
+
+                                <!-- Custom Icon write-in footer -->
+                                <div class="pt-2 border-t border-slate-100 dark:border-slate-700 flex items-center space-x-2 shrink-0">
+                                    <input type="text" id="customIconTextInput" placeholder="Custom: fa-xxx" class="flex-1 px-2.5 py-1 text-[11px] font-mono bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none">
+                                    <button type="button" onclick="applyCustomIcon()" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold rounded-lg shadow-sm">Set</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
@@ -1846,13 +1927,18 @@
             checkSystemTheme();
             checkLocalServerStatus();
             
-            // Close drawer on outside click
+            // Close drawer or icon picker on outside click
             document.addEventListener('click', function(e) {
                 const drawer = document.getElementById('appGridDrawer');
                 const toggleBtn = document.getElementById('appGridToggle');
-                if (!drawer || !toggleBtn) return;
-                if (!drawer.contains(e.target) && !toggleBtn.contains(e.target) && !drawer.classList.contains('hidden')) {
+                if (drawer && toggleBtn && !drawer.contains(e.target) && !toggleBtn.contains(e.target) && !drawer.classList.contains('hidden')) {
                     closeAppGridDrawer();
+                }
+
+                const iconPickerWrapper = document.getElementById('iconPickerWrapper');
+                const iconDropdown = document.getElementById('iconPickerDropdown');
+                if (iconDropdown && !iconDropdown.classList.contains('hidden') && iconPickerWrapper && !iconPickerWrapper.contains(e.target)) {
+                    closeIconPickerDropdown();
                 }
             });
 
@@ -1863,6 +1949,7 @@
                     if (drawer && !drawer.classList.contains('hidden')) {
                         closeAppGridDrawer();
                     }
+                    closeIconPickerDropdown();
                 }
             });
         };
@@ -2448,6 +2535,16 @@
             // Activate fullscreen mode
             document.body.classList.add('app-fullscreen-mode');
 
+            // Collapse middle-right dock by default so embedded app's header is completely unobstructed
+            const topRightNav = document.getElementById('topRightNav');
+            if (topRightNav) topRightNav.classList.add('dock-collapsed');
+
+            // Hide bottom actions in 9-dots drawer while app is open
+            const drawerBottomActions = document.getElementById('drawerBottomActions');
+            if (drawerBottomActions) drawerBottomActions.classList.add('hidden');
+            const drawerEditBtn = document.getElementById('drawerEditBtn');
+            if (drawerEditBtn) drawerEditBtn.classList.add('hidden');
+
             document.getElementById('dashboardHomeView').classList.add('hidden');
             document.getElementById('activeAppView').classList.remove('hidden');
 
@@ -2533,6 +2630,15 @@
             // Deactivate fullscreen mode
             document.body.classList.remove('app-fullscreen-mode');
 
+            const topRightNav = document.getElementById('topRightNav');
+            if (topRightNav) topRightNav.classList.remove('dock-collapsed');
+
+            // Restore bottom actions in 9-dots drawer
+            const drawerBottomActions = document.getElementById('drawerBottomActions');
+            if (drawerBottomActions) drawerBottomActions.classList.remove('hidden');
+            const drawerEditBtn = document.getElementById('drawerEditBtn');
+            if (drawerEditBtn) drawerEditBtn.classList.remove('hidden');
+
             document.getElementById('activeAppView').classList.add('hidden');
             document.getElementById('dashboardHomeView').classList.remove('hidden');
 
@@ -2555,12 +2661,19 @@
             if (securityBanner) securityBanner.classList.add('hidden');
 
             // Close app drawer if open
-            const drawer = document.getElementById('appGridDrawer');
-            if (drawer && !drawer.classList.contains('hidden')) {
-                toggleAppGridDrawer();
-            }
+            closeAppGridDrawer();
 
             currentActiveApp = null;
+        }
+
+        // Toggle Middle-Right Collapsible Dock in App Mode
+        function toggleAppDockCollapse() {
+            const nav = document.getElementById('topRightNav');
+            if (!nav) return;
+            nav.classList.toggle('dock-collapsed');
+            if (nav.classList.contains('dock-collapsed')) {
+                closeAppGridDrawer();
+            }
         }
 
         function toggleNativeFullscreen() {
@@ -2651,6 +2764,236 @@
             }
         }
 
+        // ==========================================
+        // FONTAWESOME SEARCHABLE ICON PICKER
+        // ==========================================
+        const FONTAWESOME_ICONS = [
+            // Finance & Trading
+            { id: 'fa-piggy-bank', name: 'Piggy Bank', category: 'Finance' },
+            { id: 'fa-coins', name: 'Coins / Wealth', category: 'Finance' },
+            { id: 'fa-wallet', name: 'Wallet', category: 'Finance' },
+            { id: 'fa-chart-line', name: 'Stock Chart Line', category: 'Finance' },
+            { id: 'fa-chart-pie', name: 'Pie Chart / Assets', category: 'Finance' },
+            { id: 'fa-money-bill-trend-up', name: 'Money Trend Up', category: 'Finance' },
+            { id: 'fa-scale-balanced', name: 'Balance Scale', category: 'Finance' },
+            { id: 'fa-vault', name: 'Vault / Safe', category: 'Finance' },
+            { id: 'fa-landmark', name: 'Bank / Landmark', category: 'Finance' },
+            { id: 'fa-receipt', name: 'Receipt / Transactions', category: 'Finance' },
+            { id: 'fa-credit-card', name: 'Credit Card', category: 'Finance' },
+            { id: 'fa-file-invoice-dollar', name: 'Invoice / Billing', category: 'Finance' },
+
+            // Servers, Cloud & Infrastructure
+            { id: 'fa-server', name: 'Server', category: 'Servers & Cloud' },
+            { id: 'fa-database', name: 'Database / SQL', category: 'Servers & Cloud' },
+            { id: 'fa-network-wired', name: 'Network Wired / LAN', category: 'Servers & Cloud' },
+            { id: 'fa-cloud', name: 'Cloud Infrastructure', category: 'Servers & Cloud' },
+            { id: 'fa-hard-drive', name: 'Hard Drive / Storage', category: 'Servers & Cloud' },
+            { id: 'fa-microchip', name: 'CPU / Microchip', category: 'Servers & Cloud' },
+            { id: 'fa-memory', name: 'RAM Memory', category: 'Servers & Cloud' },
+            { id: 'fa-terminal', name: 'Terminal / CLI', category: 'Servers & Cloud' },
+            { id: 'fa-sitemap', name: 'Sitemap / Architecture', category: 'Servers & Cloud' },
+            { id: 'fa-cubes', name: 'Cubes / Microservices', category: 'Servers & Cloud' },
+            { id: 'fa-box-archive', name: 'Archive / Backup', category: 'Servers & Cloud' },
+            { id: 'fa-boxes-stacked', name: 'Containers / Docker', category: 'Servers & Cloud' },
+            { id: 'fa-ethernet', name: 'Ethernet Cable', category: 'Servers & Cloud' },
+
+            // Web, Dev & Networking
+            { id: 'fa-globe', name: 'Globe / Internet', category: 'Web & Dev' },
+            { id: 'fa-code', name: 'Code / Development', category: 'Web & Dev' },
+            { id: 'fa-file-code', name: 'Source Code File', category: 'Web & Dev' },
+            { id: 'fa-gears', name: 'Gears / Automation', category: 'Web & Dev' },
+            { id: 'fa-gear', name: 'Settings / Config', category: 'Web & Dev' },
+            { id: 'fa-screwdriver-wrench', name: 'Tools / Maintenance', category: 'Web & Dev' },
+            { id: 'fa-wrench', name: 'Wrench', category: 'Web & Dev' },
+            { id: 'fa-bug', name: 'Debugger / Bug', category: 'Web & Dev' },
+            { id: 'fa-satellite-dish', name: 'Satellite / Gateway', category: 'Web & Dev' },
+            { id: 'fa-wifi', name: 'Wi-Fi Wireless', category: 'Web & Dev' },
+            { id: 'fa-signal', name: 'Signal / Telemetry', category: 'Web & Dev' },
+            { id: 'fa-link', name: 'Hyperlink / URL', category: 'Web & Dev' },
+            { id: 'fa-arrow-up-right-from-square', name: 'External Link', category: 'Web & Dev' },
+            { id: 'fa-download', name: 'Download Service', category: 'Web & Dev' },
+            { id: 'fa-upload', name: 'Upload Service', category: 'Web & Dev' },
+            { id: 'fa-rss', name: 'RSS Feed', category: 'Web & Dev' },
+
+            // Security & Admin
+            { id: 'fa-shield-halved', name: 'Shield / Firewall', category: 'Security' },
+            { id: 'fa-lock', name: 'Lock / HTTPS', category: 'Security' },
+            { id: 'fa-unlock', name: 'Unlock', category: 'Security' },
+            { id: 'fa-key', name: 'Key / Credentials', category: 'Security' },
+            { id: 'fa-user-shield', name: 'Admin Security', category: 'Security' },
+            { id: 'fa-user-gear', name: 'User Management', category: 'Security' },
+            { id: 'fa-fingerprint', name: 'Fingerprint / 2FA', category: 'Security' },
+            { id: 'fa-passport', name: 'Passport / Auth', category: 'Security' },
+            { id: 'fa-id-card', name: 'ID Card', category: 'Security' },
+            { id: 'fa-triangle-exclamation', name: 'Warning / Alert', category: 'Security' },
+
+            // Dashboards & Analytics
+            { id: 'fa-gauge-high', name: 'Gauge / Grafana', category: 'Analytics' },
+            { id: 'fa-chart-simple', name: 'Simple Chart', category: 'Analytics' },
+            { id: 'fa-chart-bar', name: 'Bar Chart', category: 'Analytics' },
+            { id: 'fa-chart-area', name: 'Area Chart', category: 'Analytics' },
+            { id: 'fa-table-columns', name: 'Table Columns', category: 'Analytics' },
+            { id: 'fa-table-cells-large', name: 'Grid View', category: 'Analytics' },
+            { id: 'fa-table-list', name: 'Table List', category: 'Analytics' },
+            { id: 'fa-sliders', name: 'Sliders / Controls', category: 'Analytics' },
+            { id: 'fa-desktop', name: 'Desktop Workstation', category: 'Hardware' },
+            { id: 'fa-display', name: 'Display Screen', category: 'Hardware' },
+            { id: 'fa-laptop', name: 'Laptop', category: 'Hardware' },
+            { id: 'fa-mobile-screen', name: 'Mobile Phone', category: 'Hardware' },
+
+            // Media & Files
+            { id: 'fa-folder', name: 'Folder', category: 'Media & Files' },
+            { id: 'fa-folder-open', name: 'Folder Open', category: 'Media & Files' },
+            { id: 'fa-folder-tree', name: 'Folder Tree', category: 'Media & Files' },
+            { id: 'fa-file-lines', name: 'Document / Text', category: 'Media & Files' },
+            { id: 'fa-file-pdf', name: 'PDF Document', category: 'Media & Files' },
+            { id: 'fa-image', name: 'Photo / Image', category: 'Media & Files' },
+            { id: 'fa-photo-film', name: 'Media Library', category: 'Media & Files' },
+            { id: 'fa-video', name: 'Video / Streams', category: 'Media & Files' },
+            { id: 'fa-film', name: 'Cinema / Movies', category: 'Media & Files' },
+            { id: 'fa-music', name: 'Music / Audio', category: 'Media & Files' },
+            { id: 'fa-headphones', name: 'Headphones', category: 'Media & Files' },
+            { id: 'fa-camera', name: 'Camera', category: 'Media & Files' },
+
+            // Smart Home & IoT
+            { id: 'fa-house-signal', name: 'Home Assistant / IoT', category: 'Smart Home' },
+            { id: 'fa-house', name: 'Home Dashboard', category: 'Smart Home' },
+            { id: 'fa-robot', name: 'Robot / AI', category: 'Smart Home' },
+            { id: 'fa-lightbulb', name: 'Lighting Control', category: 'Smart Home' },
+            { id: 'fa-plug', name: 'Smart Plug / Power', category: 'Smart Home' },
+            { id: 'fa-bolt', name: 'Fast / Energy', category: 'Smart Home' },
+            { id: 'fa-battery-full', name: 'Battery Status', category: 'Smart Home' },
+            { id: 'fa-fan', name: 'Cooling Fan', category: 'Smart Home' },
+            { id: 'fa-temperature-half', name: 'Thermometer', category: 'Smart Home' },
+
+            // Productivity & General
+            { id: 'fa-calendar-days', name: 'Calendar', category: 'Productivity' },
+            { id: 'fa-clock', name: 'Clock / Schedules', category: 'Productivity' },
+            { id: 'fa-bell', name: 'Notifications', category: 'Productivity' },
+            { id: 'fa-bookmark', name: 'Bookmark', category: 'Productivity' },
+            { id: 'fa-list-check', name: 'Checklist / Tasks', category: 'Productivity' },
+            { id: 'fa-envelope', name: 'Email Server', category: 'Productivity' },
+            { id: 'fa-comments', name: 'Chat / Matrix', category: 'Productivity' },
+            { id: 'fa-bullhorn', name: 'Announcements', category: 'Productivity' },
+            { id: 'fa-gamepad', name: 'Gaming Server', category: 'Entertainment' },
+            { id: 'fa-star', name: 'Star / Favorite', category: 'General' },
+            { id: 'fa-heart', name: 'Heart / Health', category: 'General' },
+            { id: 'fa-circle-check', name: 'Checkmark / Verified', category: 'General' },
+            { id: 'fa-circle-info', name: 'Information', category: 'General' }
+        ];
+
+        function renderIconPickerList(filterText = '') {
+            const grid = document.getElementById('iconPickerGrid');
+            const countEl = document.getElementById('iconPickerCount');
+            const currentVal = document.getElementById('appIconInput')?.value || 'fa-server';
+            if (!grid) return;
+
+            const q = filterText.toLowerCase().trim();
+            const filtered = q === '' 
+                ? FONTAWESOME_ICONS 
+                : FONTAWESOME_ICONS.filter(i => 
+                    i.id.toLowerCase().includes(q) || 
+                    i.name.toLowerCase().includes(q) || 
+                    i.category.toLowerCase().includes(q)
+                );
+
+            if (countEl) {
+                countEl.innerText = `${filtered.length} icon${filtered.length === 1 ? '' : 's'} found`;
+            }
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `
+                    <div class="py-6 text-center text-slate-400">
+                        <i class="fa-solid fa-magnifying-glass text-lg mb-1 block opacity-50"></i>
+                        <span class="text-xs">No matching icon found</span>
+                        <span class="text-[10px] block mt-1 text-slate-500">Type a custom class below (e.g. fa-xxx)</span>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = filtered.map(icon => {
+                const isSelected = icon.id === currentVal;
+                return `
+                    <div onclick="selectPickerIcon('${icon.id}', '${icon.name.replace(/'/g, "\\'")}')" 
+                        class="flex items-center justify-between p-2 rounded-xl hover:bg-blue-50 dark:hover:bg-slate-700/70 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 dark:bg-slate-700/80 ring-1 ring-blue-500/50' : ''}">
+                        <div class="flex items-center space-x-2.5 truncate">
+                            <span class="w-7 h-7 rounded-lg ${isSelected ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-200'} flex items-center justify-center shrink-0">
+                                <i class="fa-solid ${icon.id} text-sm"></i>
+                            </span>
+                            <div class="truncate">
+                                <span class="text-xs font-semibold text-slate-800 dark:text-slate-100 block truncate leading-tight">${icon.name}</span>
+                                <span class="text-[10px] font-mono text-slate-400 dark:text-slate-500 block truncate">${icon.id}</span>
+                            </div>
+                        </div>
+                        <span class="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 shrink-0 ml-1">${icon.category}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function filterIconPickerList(val) {
+            renderIconPickerList(val);
+        }
+
+        function toggleIconPickerDropdown() {
+            const dropdown = document.getElementById('iconPickerDropdown');
+            const chevron = document.getElementById('iconPickerChevron');
+            if (!dropdown) return;
+            const isHidden = dropdown.classList.contains('hidden');
+            if (isHidden) {
+                dropdown.classList.remove('hidden');
+                if (chevron) chevron.style.transform = 'rotate(180deg)';
+                const searchInput = document.getElementById('iconSearchInput');
+                if (searchInput) {
+                    searchInput.value = '';
+                    setTimeout(() => searchInput.focus(), 50);
+                }
+                renderIconPickerList('');
+            } else {
+                closeIconPickerDropdown();
+            }
+        }
+
+        function closeIconPickerDropdown() {
+            const dropdown = document.getElementById('iconPickerDropdown');
+            const chevron = document.getElementById('iconPickerChevron');
+            if (dropdown) dropdown.classList.add('hidden');
+            if (chevron) chevron.style.transform = 'rotate(0deg)';
+        }
+
+        function selectPickerIcon(iconId, iconName) {
+            const input = document.getElementById('appIconInput');
+            const preview = document.getElementById('selectedIconPreview');
+            const label = document.getElementById('selectedIconLabel');
+            if (input) input.value = iconId;
+            if (preview) preview.className = `fa-solid ${iconId} text-sm`;
+            if (label) label.innerText = `${iconId} (${iconName})`;
+            closeIconPickerDropdown();
+        }
+
+        function setIconPickerValue(iconId) {
+            const input = document.getElementById('appIconInput');
+            const preview = document.getElementById('selectedIconPreview');
+            const label = document.getElementById('selectedIconLabel');
+            const cleanId = (iconId || 'fa-server').trim();
+            if (input) input.value = cleanId;
+            if (preview) preview.className = `fa-solid ${cleanId} text-sm`;
+            const matched = FONTAWESOME_ICONS.find(i => i.id === cleanId);
+            const displayLabel = matched ? `${cleanId} (${matched.name})` : cleanId;
+            if (label) label.innerText = displayLabel;
+        }
+
+        function applyCustomIcon() {
+            const customInput = document.getElementById('customIconTextInput');
+            if (!customInput) return;
+            let val = customInput.value.trim();
+            if (!val) return;
+            if (!val.startsWith('fa-')) val = 'fa-' + val;
+            setIconPickerValue(val);
+            closeIconPickerDropdown();
+        }
+
         // Populate Category Dropdown
         function populateCategoryDropdown(selectedVal = '') {
             const select = document.getElementById('appCategoryInput');
@@ -2665,6 +3008,7 @@
             document.getElementById('appModalTitle').innerText = 'Add New IP App';
             document.getElementById('appForm').reset();
             populateCategoryDropdown();
+            setIconPickerValue('fa-server');
             document.getElementById('appLaunchModeInput').value = 'iframe';
             document.getElementById('appModal').classList.remove('hidden');
         }
@@ -2676,7 +3020,7 @@
             document.getElementById('appModalTitle').innerText = 'Edit IP App';
             document.getElementById('appNameInput').value = app.name;
             document.getElementById('appUrlInput').value = app.url;
-            document.getElementById('appIconInput').value = app.icon;
+            setIconPickerValue(app.icon || 'fa-server');
             document.getElementById('appColorInput').value = app.color;
             document.getElementById('appSectionInput').value = app.section || 'favorite';
             document.getElementById('appLaunchModeInput').value = app.launchMode || (isKnownIframeBlocked(app.url) ? 'newtab' : 'iframe');
@@ -2686,6 +3030,7 @@
         }
 
         function closeAddAppModal() {
+            closeIconPickerDropdown();
             document.getElementById('appModal').classList.add('hidden');
             document.getElementById('appForm').reset();
         }
