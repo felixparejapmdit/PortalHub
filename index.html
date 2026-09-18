@@ -357,10 +357,10 @@
                         </div>
                     </div>
 
-                    <!-- 4. Main Cyan Action Button: "->] SIGN IN TO IPON" matching reference image -->
+                    <!-- 4. Main Cyan Action Button: "->] SIGN IN" -->
                     <button type="submit" id="authSubmitBtn" class="w-full py-3 px-4 bg-[#22d3ee] hover:bg-[#06b6d4] text-[#081528] font-extrabold font-mono text-xs rounded-xl shadow-lg shadow-cyan-500/15 flex items-center justify-center space-x-2 transition-all">
                         <i id="authSubmitIcon" class="fa-solid fa-arrow-right-to-bracket text-xs"></i>
-                        <span id="authSubmitText">SIGN IN TO IPON</span>
+                        <span id="authSubmitText">SIGN IN</span>
                     </button>
                 </form>
 
@@ -908,10 +908,19 @@
         // ==========================================
         const MAIN_ADMIN_EMAIL = 'felixpareja.pmdit07@gmail.com';
         
+        const DEFAULT_FIREBASE_CONFIG = {
+            projectId: "ipon-pse-portfolio",
+            appId: "1:78974476091:web:09d65f9302ae090418611e",
+            storageBucket: "ipon-pse-portfolio.firebasestorage.app",
+            apiKey: "AIzaSyDs_ZqUwIY20Udq1hd1ArsyeT_y3Ld9wK0",
+            authDomain: "ipon-pse-portfolio.firebaseapp.com",
+            messagingSenderId: "78974476091"
+        };
+
         let currentUser = JSON.parse(localStorage.getItem('portal_auth_user')) || null;
         let approvedUsers = JSON.parse(localStorage.getItem('portal_approved_users')) || [MAIN_ADMIN_EMAIL];
         let pendingRequests = JSON.parse(localStorage.getItem('portal_access_requests')) || [];
-        let firebaseConfig = JSON.parse(localStorage.getItem('portal_firebase_config')) || null;
+        let firebaseConfig = JSON.parse(localStorage.getItem('portal_firebase_config')) || DEFAULT_FIREBASE_CONFIG;
         let isFirebaseActive = false;
         let isRegisterMode = false;
 
@@ -949,6 +958,18 @@
                             });
                         }
                     });
+
+                    // Check for redirect sign-in result if popup was blocked
+                    firebase.auth().getRedirectResult().then(result => {
+                        if (result && result.user) {
+                            processUserLogin({
+                                name: result.user.displayName || result.user.email.split('@')[0],
+                                email: result.user.email,
+                                picture: result.user.photoURL || '',
+                                uid: result.user.uid
+                            });
+                        }
+                    }).catch(err => console.log('Redirect result notice:', err));
 
                     // Sync access requests with Firestore collection
                     syncFromFirestore();
@@ -994,42 +1015,40 @@
             }
         }
 
-        // 1. Google Sign-In (Firebase Auth with seamless local fallback)
+        // 1. Google Sign-In with Real Google Account Popup (No prompt dialogs)
         async function handleGoogleSignIn() {
-            if (isFirebaseActive && window.firebase) {
-                try {
-                    const provider = new firebase.auth.GoogleAuthProvider();
-                    const result = await firebase.auth().signInWithPopup(provider);
-                    const user = result.user;
-                    processUserLogin({
-                        name: user.displayName || 'Google User',
-                        email: user.email,
-                        picture: user.photoURL || '',
-                        uid: user.uid
-                    });
+            try {
+                if (!window.firebase) {
+                    showToast('Loading Google Authentication services...');
                     return;
-                } catch(err) {
-                    console.warn('Firebase popup sign-in fallback:', err);
-                    if (err.code !== 'auth/popup-closed-by-user') {
-                        showToast(err.message || 'Firebase sign-in error');
-                    }
                 }
-            }
-
-            // Standalone / Offline Google Sign-In prompt
-            const choice = prompt(
-                `Google Sign-In Account:\n1. Admin Felix (felixpareja.pmdit07@gmail.com)\n2. Custom Google Email\n\nEnter 1 for Admin, or type an email:`,
-                "1"
-            );
-
-            if (!choice) return;
-
-            if (choice === '1' || choice.trim().toLowerCase() === MAIN_ADMIN_EMAIL) {
-                quickSignInAdmin();
-            } else {
-                const email = choice.trim().toLowerCase();
-                const name = email.split('@')[0];
-                processUserLogin({ name: name.charAt(0).toUpperCase() + name.slice(1), email: email, picture: '' });
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig || DEFAULT_FIREBASE_CONFIG);
+                }
+                const provider = new firebase.auth.GoogleAuthProvider();
+                provider.setCustomParameters({ prompt: 'select_account' });
+                showToast('Opening Google Sign-In...');
+                const result = await firebase.auth().signInWithPopup(provider);
+                if (result && result.user) {
+                    processUserLogin({
+                        name: result.user.displayName || result.user.email.split('@')[0],
+                        email: result.user.email,
+                        picture: result.user.photoURL || '',
+                        uid: result.user.uid
+                    });
+                }
+            } catch(err) {
+                console.warn('Google Sign-In notice:', err);
+                if (err.code === 'auth/popup-closed-by-user') {
+                    showToast('Google Sign-In cancelled');
+                } else if (err.code === 'auth/popup-blocked') {
+                    showToast('Popup was blocked by your browser. Redirecting to Google Sign-In...');
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    provider.setCustomParameters({ prompt: 'select_account' });
+                    firebase.auth().signInWithRedirect(provider);
+                } else {
+                    showToast(err.message || 'Google Sign-In failed');
+                }
             }
         }
 
@@ -1093,7 +1112,7 @@
                     submitBtn.classList.add('bg-emerald-400', 'hover:bg-emerald-500');
                 }
             } else {
-                if (submitText) submitText.innerText = 'SIGN IN TO IPON';
+                if (submitText) submitText.innerText = 'SIGN IN';
                 if (toggleBtn) toggleBtn.innerText = "Don't have an account? Register";
                 if (submitBtn) {
                     submitBtn.classList.remove('bg-emerald-400', 'hover:bg-emerald-500');
