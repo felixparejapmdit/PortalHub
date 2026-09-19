@@ -1090,20 +1090,9 @@
     </div>
 
     <script>
-        const defaultCategories = ['Finance', 'Servers & Cloud', 'Smart Home', 'Dashboard', 'Tools', 'Productivity'];
+        const defaultCategories = ['Servers & Cloud', 'Smart Home', 'Dashboard', 'Tools', 'Productivity'];
         
         const defaultApps = [
-            {
-                id: 'ipon',
-                name: 'Ipon',
-                url: 'https://ipon-pse-portfolio.web.app/',
-                category: 'Finance',
-                section: 'favorite',
-                icon: 'fa-piggy-bank',
-                color: 'from-emerald-500 to-teal-600',
-                launchMode: 'iframe',
-                description: 'PSE portfolio tracker and savings management application.'
-            },
             {
                 id: 'homeassistant',
                 name: 'Home Assistant',
@@ -2360,7 +2349,17 @@
             updateAuthUI();
             setupCrossTabSyncAndAutoRefresh();
 
-            // Sample Apps Sync: Ensure default apps (Ipon + 6 additional sample apps) and default categories are available
+            // Sample Apps Sync: Ensure default apps (6 sample apps) and default categories are available
+            // Remove previous sample Ipon app if present
+            if (apps.some(a => a.id === 'ipon' && (a.url || '').includes('ipon-pse-portfolio'))) {
+                apps = apps.filter(a => !(a.id === 'ipon' && (a.url || '').includes('ipon-pse-portfolio')));
+                localStorage.setItem('myportal_apps', JSON.stringify(apps));
+            }
+            // Remove Finance category if it was from previous default and has no apps
+            if (!apps.some(a => a.category === 'Finance') && categories.includes('Finance')) {
+                categories = categories.filter(c => c !== 'Finance');
+                localStorage.setItem('myportal_categories', JSON.stringify(categories));
+            }
             defaultApps.forEach(sampleApp => {
                 if (!apps.some(a => a.id === sampleApp.id)) {
                     apps.push(JSON.parse(JSON.stringify(sampleApp)));
