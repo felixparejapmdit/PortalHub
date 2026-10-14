@@ -2,40 +2,42 @@
 
 <div align="center">
   <img src="apple-touch-icon.png" alt="PortalHub Logo" width="128" height="128" style="border-radius: 28px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
-  <h3>Unified Service Gateway & Family Portfolio Hub</h3>
-  <p>Dual-stack IPv4/IPv6 intranet launcher with Google Authentication, Access-Gated Admin Approval, and PWA Mobile Support.</p>
+  <h3>One launcher for your home-lab services, local projects, and web apps</h3>
+  <p>Dashboards, pinned apps, command palette, split view, QR codes, offline support, Google sign-in with admin approval.</p>
 </div>
 
 ---
 
 ## Features
 
-- **Google Authentication & Access Control**:
-  - Google sign-in through Firebase Authentication (popup, with redirect fallback).
-  - **Super Administrator**: `felixpareja.pmdit07@gmail.com` enjoys instant access and family approval authority.
-  - **Access-Gated Family Approval Flow**: Non-admin sign-ins generate an access request awaiting admin verification.
-  - **Admin Access Requests Modal**: Approve or decline family member sign-up requests, view processed statuses, and pre-approve members with 1 click.
-- **Unified Service Launcher**:
-  - Launch internal web applications in fullscreen iframe mode, or in a new tab for sites that block embedding.
-  - On the HTTPS-hosted site, plain-`http://` LAN services open in a new tab automatically (browsers block them inside a secure page).
-  - Collapsible side dock with app switcher, popout, reload, and fullscreen controls.
-  - **Grid view is the default**; **List** and 3D **Carousel** views are one click away, and your choice is remembered.
-  - One search box filters every view by name, address, category, or description.
+- **Dashboards**: separate pages such as *Home*, *Work* and *Family*. Add, rename or remove them from the tab bar or Settings.
+- **Grid view by default**, plus a compact **List** and a 3D **Carousel**. Every view uses cards, and your choice is remembered.
+- **Pinned block**: pin your most-used apps to their own block at the top of each dashboard.
+- **Drag to reorder**: drag cards within a block, or between *Pinned* and *All services* to pin or unpin. With the keyboard, focus a card and press `Alt` + arrow keys, or use the card's ⋯ menu (*Move earlier / later*).
+- **Sort** by custom order, recently used, most used, or name.
+- **Tags and categories** with multi-select filter chips (categories narrow by category, `#tags` by tag).
+- **Command palette** (`Ctrl K` / `⌘K`): jump to any app on any dashboard, search `#tags`, switch views, sort, theme, export/import, and admin tools.
+- **Auto-fill**: paste an address and PortalHub reads the page's title, description and icon. LAN pages are read through the local gateway (`serve.py`); public sites use their public icon. Sites that block embedding are set to open in a new tab automatically.
+- **QR code per app**: open any app on your phone. `localhost` addresses are rewritten to this computer's LAN IP.
+- **Split view**: open two apps side by side, with a resizable divider (drag it, or use the arrow keys when it's focused).
+- **Backup & restore**: export everything to JSON, then merge it back in or replace your apps.
+- **Delete with Undo**: deleting an app shows an *Undo* button instead of a confirmation prompt.
+- **Offline mode & installable app (PWA)**: a service worker caches the portal, its scripts, fonts and icons, so PortalHub opens without internet and your LAN apps keep working. You can install it from the account menu or the browser's install button.
+- **Activity log (admin)**: sign-ins, sign-outs, access requests, approvals, revocations and app opens, grouped by day and filterable.
+- **Google sign-in & admin approval**: new people request access, and the admin approves or declines them in real time. Pre-approve family members by email.
+- **Design**: light and true-black dark themes with frosted-glass surfaces and electric-blue / emerald accents.
 
 ### Keyboard shortcuts
 
 | Key | Action |
 | --- | --- |
-| `/` | Focus the search box |
-| `Enter` (in search) | Open the first matching service |
-| `Esc` | Clear the search, or close the open dialog/menu |
-| `←` / `→` | Browse services in Carousel view |
-- **PWA & Mobile Ready**:
-  - Full Apple mobile web app capability (`apple-mobile-web-app-capable: yes`, `black-translucent` status bar).
-  - High-resolution `apple-touch-icon.png` and `manifest.json` for home screen install.
-- **Dual-Stack Local Gateway**:
-  - Python multithreaded dual-stack server supporting `http://localhost:8088` (IPv6 `::1`), `http://127.0.0.1:8088` (IPv4), and LAN IPs.
-  - Permissive CORS headers allowing seamless embedding of local subprojects.
+| `Ctrl K` / `⌘K` | Command palette (switch apps while one is open) |
+| `/` | Filter the current dashboard |
+| `Enter` (in the filter box) | Open the first match |
+| `Esc` | Clear the filter, or close the open dialog / menu |
+| `Alt` + arrows (on a focused card) | Move the card earlier / later |
+| `Shift F10` or `Menu` key (on a card) | Open the card's actions menu |
+| `←` / `→` | Browse in Carousel view |
 
 ---
 
@@ -55,31 +57,53 @@ python serve.py --no-browser # server only
 Open your browser to:
 [http://localhost:8088/Portal/index.html](http://localhost:8088/Portal/index.html)
 
+The console also prints `LAN URL` lines you can open from a phone on the same Wi-Fi.
+
 ---
 
 ## Project Structure
 
 ```
 Portal/
-├── index.html            # Main PortalHub application & dashboard
-├── manifest.json         # Progressive Web App manifest
-├── apple-touch-icon.png  # High-res PWA & Apple Touch icon
-├── favicon.png           # Browser tab favicon
-├── serve.py              # Multithreaded dual-stack IPv4/IPv6 server
-├── start_portal.bat      # One-click Windows server launcher
-└── README.md             # Documentation
+├── index.html              # Page markup and design system (CSS tokens, glass components)
+├── js/
+│   ├── portal-auth.js      # Sign-in, admin approval, Firestore sync, audit log
+│   ├── portal-app.js       # Dashboards, cards, filters, palette, split view, QR, backups, offline
+│   └── vendor/             # SortableJS 1.15.2 (drag & drop), qrcode-generator 1.4.4 (MIT)
+├── sw.js                   # Service worker (offline support)
+├── manifest.json           # Progressive Web App manifest
+├── icons/                  # PWA icons (192, 512, maskable) and source artwork
+├── apple-touch-icon.png    # 180×180 home-screen icon
+├── favicon.png             # 48×48 browser tab icon
+├── firestore.rules         # Firestore security rules
+├── firebase.json           # Firebase Hosting config
+├── serve.py                # Local dual-stack gateway + metadata API for auto-fill and QR codes
+├── start_portal.bat        # One-click Windows server launcher
+└── README.md
 ```
+
+### Local gateway API (`serve.py`)
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/info` | This machine's LAN addresses (used by QR codes) |
+| `GET /api/meta?url=…` | Title, description and icon of a page (used by auto-fill) |
+
+The API answers only same-origin requests from a local host name. It sends no CORS headers,
+refuses cross-site and DNS-rebinding requests, and returns only the title/description/icon, never page bodies.
 
 ---
 
 ## Authentication & Security
 
-- **Primary Admin**: `felixpareja.pmdit07@gmail.com`
-- **Continue with Google**: Powered by Google & Firebase Auth with one-click access.
-- **Firebase & Firestore Ready**:
-  - Pre-configured with Firebase 10.x SDKs (`firebase-app`, `firebase-auth`, and `firebase-firestore`).
-  - Supports pasting your Firebase project credentials in Settings for real-time cloud authentication and multi-device access request synchronization.
-  - Zero-setup offline fallback ensures full local operation without required cloud keys.
+- **Admin**: `felixpareja.pmdit07@gmail.com`. Sign in with **Google** as the admin: the Firestore rules
+  require a verified email for admin actions, so an unverified email/password account can't use that address.
+- **Firestore rules** (`firestore.rules`):
+  - `access_requests`: people can file and refresh only their own request; only the admin can list, read others', or delete.
+  - `portal_settings/access_control`: readable by signed-in users (pending users watch for their approval), writable only by the admin.
+  - `audit_log`: write-once entries with a server timestamp; only the admin can read them or record approve/decline/revoke events.
+- Everything rendered from app data or Firestore is HTML-escaped.
+- Apps, dashboards and categories are stored per browser (`localStorage`). Use *Export backup* / *Import backup* to move them between devices.
 
 ---
 
@@ -109,10 +133,11 @@ Your local workspace is already connected to `portalhub-f3221` via `.firebaserc`
 }
 ```
 
-### Step 4: Deploy to Hosting
-Run the deploy command inside `d:\PROJECTS\Portal`:
+### Step 4: Deploy Hosting and the Firestore rules
+Run inside `d:\PROJECTS\Portal`:
 ```bash
-firebase deploy --only hosting
+firebase deploy --only firestore:rules --dry-run   # check the rules compile
+firebase deploy --only hosting,firestore:rules
 ```
 Once complete, your app is live at:
 - **`https://portalhub-f3221.web.app`**
@@ -127,9 +152,6 @@ On your [Firebase Console for portalhub-f3221](https://console.firebase.google.c
 2. **Add Web App** (for SDK Config):
    - On the Project Overview page, click the **`+ Add app`** button and select the **`</>` Web** icon.
    - App nickname: `PortalHub` &rarr; click **Register app**.
-   - Copy the generated `firebaseConfig` object and paste it into PortalHub Settings (or into `DEFAULT_FIREBASE_CONFIG` in `index.html`).
+   - Copy the generated `firebaseConfig` object and paste it into PortalHub Settings (or into `DEFAULT_FIREBASE_CONFIG` in `js/portal-auth.js`).
 3. **Verify Authorized Domains**:
    - In **Authentication** &rarr; **Settings** &rarr; **Authorized domains**, ensure `portalhub-f3221.web.app` and `localhost` are listed.
-
-
-

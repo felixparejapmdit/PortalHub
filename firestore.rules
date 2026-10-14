@@ -1,11 +1,68 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /access_requests/{requestId} {
-      allow read, write: if true;
+
+    function signedIn() {
+      return request.auth != null;
     }
+
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    // The PortalHub administrator. A verified email (Google sign-in) is required so an
+    // unverified email/password account can't claim the admin address.
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email == 'felixpareja.pmdit07@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    function isValidAccessRequest() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['id', 'name', 'email', 'picture', 'requestedAt', 'status'])
+        && data.email == myEmail()
+        && data.status == 'pending'
+        && data.name is string && data.name.size() <= 120
+        && data.picture is string && data.picture.size() <= 2048
+        && data.requestedAt is string && data.requestedAt.size() <= 64;
+    }
+
+    // Access requests: people file and refresh only their own request;
+    // only the admin can list them, read other people's, or remove them.
+    match /access_requests/{requestId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.email == myEmail());
+      allow create: if signedIn() && isValidAccessRequest();
+      allow update: if signedIn() && isValidAccessRequest() && resource.data.email == myEmail();
+      allow delete: if isAdmin();
+    }
+
+    // Approved/declined member lists: pending members read this to see when they are approved;
+    // only the admin can change it.
+    match /portal_settings/access_control {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
     match /portal_settings/{document=**} {
-      allow read, write: if true;
+      allow read, write: if isAdmin();
+    }
+
+    // Audit log: write-once entries stamped with the server time, readable only by the admin.
+    // Access decisions can only be recorded by the admin.
+    match /audit_log/{entryId} {
+      allow read: if isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['type', 'email', 'name', 'target', 'client', 'at'])
+        && request.resource.data.email == myEmail()
+        && request.resource.data.at == request.time
+        && request.resource.data.type in ['sign_in', 'sign_out', 'access_request', 'app_open', 'backup_import',
+                                          'approve', 'decline', 'revoke', 'pre_approve']
+        && (!(request.resource.data.type in ['approve', 'decline', 'revoke', 'pre_approve']) || isAdmin())
+        && request.resource.data.name is string && request.resource.data.name.size() <= 120
+        && request.resource.data.target is string && request.resource.data.target.size() <= 300
+        && request.resource.data.client is string && request.resource.data.client.size() <= 80;
+      allow update, delete: if false;
     }
   }
 }
