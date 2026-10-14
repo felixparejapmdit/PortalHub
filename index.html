@@ -16,12 +16,10 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="manifest" href="manifest.json">
-        <!-- Firebase App, Auth & Firestore SDKs (v10 Compat) -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <!-- Google Identity Services -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Firebase App, Auth & Firestore SDKs (v10 Compat). Deferred: connected on DOMContentLoaded -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js" defer></script>
     <script>
         // Suppress Tailwind Play CDN development notice in browser console
         (function() {
@@ -80,6 +78,23 @@
         }
         .app-card-hover:hover {
             background-color: rgba(241, 245, 249, 0.7);
+        }
+        /* Grid card edit/delete actions: revealed on hover/focus for mouse users, always visible on touch */
+        @media (hover: hover) {
+            .card-actions {
+                opacity: 0;
+                transition: opacity 0.15s ease;
+            }
+            .group:hover .card-actions,
+            .group:focus-within .card-actions {
+                opacity: 1;
+            }
+        }
+        .scrollbar-none {
+            scrollbar-width: none;
+        }
+        .scrollbar-none::-webkit-scrollbar {
+            display: none;
         }
         .dark .app-card-hover:hover {
             background-color: rgba(51, 65, 85, 0.5);
@@ -221,7 +236,8 @@
 </head>
 <body class="h-full bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans antialiased overflow-hidden flex flex-col">
 
-    <header class="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 md:px-8 flex items-center justify-between z-40 shrink-0">
+    <!-- Header and dashboard start hidden; updateAuthUI() reveals them once the user is approved -->
+    <header class="hidden h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 md:px-8 flex items-center justify-between z-40 shrink-0">
         <!-- Left: Back Button & Branding -->
         <div id="headerLeft" class="flex items-center space-x-3">
             <button id="backToHomeBtn" onclick="returnToDashboard()" class="hidden items-center space-x-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-xs font-medium transition-colors text-slate-700 dark:text-slate-200">
@@ -233,15 +249,12 @@
                 <div class="w-9 h-9 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
                     <i class="fa-solid fa-network-wired text-sm"></i>
                 </div>
-                <div>
-                    <div class="flex items-center space-x-2">
-                        <h1 class="font-bold text-base leading-tight tracking-tight">PortalHub</h1>
-                        <span id="gatewayStatusBadge" class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
-                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5" id="gatewayStatusDot"></span>
-                            <span id="gatewayStatusText">Checking Gateway...</span>
-                        </span>
-                    </div>
-                    <p class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Central Terminal</p>
+                <div class="flex items-center space-x-2">
+                    <h1 class="font-bold text-base leading-tight tracking-tight">PortalHub</h1>
+                    <span id="gatewayStatusBadge" class="hidden items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
+                        <span class="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5" id="gatewayStatusDot"></span>
+                        <span id="gatewayStatusText"></span>
+                    </span>
                 </div>
             </div>
         </div>
@@ -291,12 +304,6 @@
                 <i id="fullscreenIcon" class="fa-solid fa-expand text-xs"></i>
             </button>
 
-            <!-- DASHBOARD MODE ONLY: + Add IP App Button matching the reference image -->
-            <button onclick="openAddAppModal()" class="dashboard-only-nav hidden sm:flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors border border-slate-200 dark:border-slate-600">
-                <i class="fa-solid fa-plus text-blue-600 dark:text-blue-400"></i>
-                <span>Add IP App</span>
-            </button>
-
             <!-- BOTH MODES: Theme Toggle -->
             <button onclick="toggleDarkMode()" title="Toggle Theme" class="app-dock-item w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors">
                 <i id="themeIcon" class="theme-icon-indicator fa-solid fa-moon text-sm"></i>
@@ -309,7 +316,7 @@
 
             <!-- BOTH MODES: Google Style 3x3 App Grid Launcher (App Switcher Menu) -->
             <div class="relative app-dock-item">
-                <button id="appGridToggle" onclick="toggleAppGridDrawer()" title="Google App Launcher / Switcher" class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-md shadow-blue-500/25 transition-all hover:scale-105">
+                <button id="appGridToggle" onclick="toggleAppGridDrawer()" title="Quick launcher" class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors">
                     <i class="fa-solid fa-grip text-sm sm:text-base"></i>
                 </button>
 
@@ -318,7 +325,7 @@
                     
                     <!-- Top section of popover -->
                     <div class="flex items-center justify-between mb-3 px-1">
-                        <span class="text-sm font-bold text-slate-800 dark:text-slate-100 tracking-tight">Your Favorites</span>
+                        <span class="text-sm font-bold text-slate-800 dark:text-slate-100 tracking-tight">Favorites</span>
                         <button id="drawerEditBtn" type="button" onclick="closeAppGridDrawer(); openSettingsModal();" title="Edit Apps" class="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-100 flex items-center justify-center transition-colors cursor-pointer">
                             <i class="fa-solid fa-pen text-xs"></i>
                         </button>
@@ -331,7 +338,7 @@
 
                     <!-- Divider & Secondary Section Header -->
                     <div id="drawerSecondarySection" class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700">
-                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2 block">OTHER SERVICES</span>
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2 block">Other services</span>
                         
                         <!-- Secondary Apps Grid (3 columns) -->
                         <div id="drawerSecondaryGrid" class="grid grid-cols-3 gap-2 py-1 max-h-[180px] overflow-y-auto">
@@ -359,10 +366,9 @@
             </button>
 
             <!-- ADMIN ONLY: Access Requests Button with Badge -->
-            <button id="navAccessRequestsBtn" onclick="openAccessRequestsModal()" title="Family Member Access Requests" class="hidden dashboard-only-nav items-center space-x-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 dark:text-amber-400 border border-amber-500/30 text-xs font-semibold transition-all">
-                <i class="fa-solid fa-user-gear"></i>
-                <span class="hidden md:inline">Requests</span>
-                <span id="navPendingBadge" class="w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold flex items-center justify-center">0</span>
+            <button id="navAccessRequestsBtn" onclick="openAccessRequestsModal()" title="Access requests" class="hidden dashboard-only-nav relative w-9 h-9 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 items-center justify-center text-slate-600 dark:text-slate-300 transition-colors">
+                <i class="fa-solid fa-user-check text-sm"></i>
+                <span id="navPendingBadge" class="hidden absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white dark:ring-slate-800">0</span>
             </button>
 
             <!-- DASHBOARD MODE ONLY: User Avatar with Interactive Dropdown -->
@@ -415,77 +421,75 @@
 
     <main class="flex-1 relative overflow-hidden flex flex-col">
                 <!-- VIEW: Sign-In Gate (Theme-Synchronized: Default Light Mode & Dark Mode Support) -->
-        <div id="authSignInView" class="hidden flex-1 overflow-y-auto flex items-center justify-center p-4 sm:p-6 bg-slate-100 dark:bg-[#070e17] text-slate-800 dark:text-white transition-colors relative">
-            <div class="max-w-[420px] w-full bg-white dark:bg-[#0b1320] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl shadow-slate-200/50 dark:shadow-2xl space-y-4 animate-in fade-in zoom-in-95 my-auto">
-                
+        <div id="authSignInView" class="hidden flex-1 overflow-y-auto flex items-center justify-center p-4 sm:p-6 bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-white transition-colors relative">
+            <div class="max-w-[400px] w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 sm:p-8 shadow-xl shadow-slate-200/60 dark:shadow-none space-y-5 my-auto">
+
                 <!-- PortalHub Branding Header (Centered in Card) -->
-                <div class="flex flex-col items-center justify-center text-center pt-1 pb-1">
-                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/25 mb-2.5">
+                <div class="flex flex-col items-center justify-center text-center">
+                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/25 mb-3">
                         <i class="fa-solid fa-network-wired text-xl"></i>
                     </div>
-                    <h2 class="font-black text-2xl tracking-tight text-slate-900 dark:text-white">
-                        Portal<span class="text-blue-600 dark:text-cyan-400">Hub</span>
-                    </h2>
-                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">Unified Service Gateway & Dashboard</p>
+                    <h2 class="font-bold text-2xl tracking-tight text-slate-900 dark:text-white">Sign in to PortalHub</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">All your services in one place</p>
                 </div>
-                
+
                 <!-- 1. "Continue with Google" Button -->
-                <button type="button" onclick="handleGoogleSignIn()" id="googleContinueBtn" class="w-full py-3 px-4 bg-white hover:bg-slate-50 dark:bg-[#1e293b] dark:hover:bg-[#28384f] text-slate-700 dark:text-white font-semibold text-xs rounded-xl border border-slate-300 dark:border-slate-700/60 shadow-sm flex items-center justify-center space-x-2.5 transition-all">
+                <button type="button" onclick="handleGoogleSignIn()" id="googleContinueBtn" class="w-full h-11 px-4 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-700 text-slate-700 dark:text-white font-semibold text-sm rounded-xl border border-slate-300 dark:border-slate-600 shadow-sm flex items-center justify-center space-x-2.5 transition-colors">
                     <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
                         <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
                         <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
                         <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
                     </svg>
-                    <span class="tracking-wide">Continue with Google</span>
+                    <span>Continue with Google</span>
                 </button>
 
-                <!-- 2. "OR EMAIL ACCESS" Separator -->
-                <div class="relative flex py-1 items-center">
-                    <div class="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
-                    <span class="flex-shrink mx-3 text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">OR EMAIL ACCESS</span>
-                    <div class="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+                <!-- 2. "or" Separator -->
+                <div class="relative flex items-center">
+                    <div class="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
+                    <span class="flex-shrink mx-3 text-xs text-slate-400 dark:text-slate-500">or use email</span>
+                    <div class="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
                 </div>
 
-                <!-- 3. Form: ACCOUNT EMAIL & PASSWORD -->
+                <!-- 3. Form: Email & Password -->
                 <form id="emailAuthForm" onsubmit="handleEmailAuthSubmit(event)" class="space-y-4">
                     <div>
-                        <label class="block text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase mb-1.5">ACCOUNT EMAIL</label>
-                        <input type="email" id="authEmailInput" required placeholder="investor@example.com" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-[#070e17] border border-slate-300 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-cyan-500 font-mono transition-all">
+                        <label for="authEmailInput" class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Email</label>
+                        <input type="email" id="authEmailInput" required autocomplete="email" placeholder="you@example.com" class="w-full h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
                     </div>
 
                     <div>
                         <div class="flex items-center justify-between mb-1.5">
-                            <label class="block text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase">PASSWORD</label>
-                            <button type="button" onclick="handleForgotPassword()" class="text-[11px] text-slate-500 dark:text-slate-400 font-mono hover:text-blue-600 dark:hover:text-cyan-400 hover:underline transition-colors">Forgot password?</button>
+                            <label for="authPasswordInput" class="block text-xs font-semibold text-slate-600 dark:text-slate-300">Password</label>
+                            <button type="button" onclick="handleForgotPassword()" class="text-xs text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors">Forgot password?</button>
                         </div>
                         <div class="relative">
-                            <input type="password" id="authPasswordInput" required placeholder="••••••••" class="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 dark:bg-[#070e17] border border-slate-300 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-cyan-500 font-mono transition-all">
-                            <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors">
-                                <i id="passwordEyeIcon" class="fa-regular fa-eye text-xs"></i>
+                            <input type="password" id="authPasswordInput" required autocomplete="current-password" placeholder="••••••••" class="w-full h-11 px-3.5 pr-10 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
+                            <button type="button" onclick="togglePasswordVisibility()" title="Show or hide password" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors">
+                                <i id="passwordEyeIcon" class="fa-regular fa-eye text-sm"></i>
                             </button>
                         </div>
                     </div>
 
-                    <!-- 4. Main Action Button: "->] SIGN IN" -->
-                    <button type="submit" id="authSubmitBtn" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 dark:bg-[#22d3ee] dark:hover:bg-[#06b6d4] text-white dark:text-[#081528] font-extrabold font-mono text-xs rounded-xl shadow-lg shadow-blue-500/25 dark:shadow-cyan-500/15 flex items-center justify-center space-x-2 transition-all">
+                    <!-- 4. Main Action Button -->
+                    <button type="submit" id="authSubmitBtn" class="w-full h-11 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl shadow-sm flex items-center justify-center space-x-2 transition-colors">
                         <i id="authSubmitIcon" class="fa-solid fa-arrow-right-to-bracket text-xs"></i>
-                        <span id="authSubmitText">SIGN IN</span>
+                        <span id="authSubmitText">Sign in</span>
                     </button>
                 </form>
 
-                <!-- 5. "Don't have an account? Register" Link -->
-                <div class="text-center pt-1 pb-1">
-                    <button type="button" onclick="toggleAuthMode()" id="toggleAuthModeBtn" class="text-xs font-mono font-medium text-blue-600 dark:text-cyan-400 hover:underline transition-colors">
-                        Don't have an account? Register
+                <!-- 5. "Don't have an account? Request access" Link -->
+                <div class="text-center">
+                    <button type="button" onclick="toggleAuthMode()" id="toggleAuthModeBtn" class="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline transition-colors">
+                        Don't have an account? Request access
                     </button>
                 </div>
             </div>
         </div>
 
         <!-- VIEW: Awaiting Admin Approval Screen (Theme-Synchronized) -->
-        <div id="authPendingView" class="hidden flex-1 overflow-y-auto flex items-center justify-center p-4 sm:p-6 bg-slate-100 dark:bg-[#070e17] text-slate-800 dark:text-white transition-colors relative">
-            <div class="max-w-md w-full flex flex-col items-center text-center animate-in fade-in zoom-in-95 my-auto">
+        <div id="authPendingView" class="hidden flex-1 overflow-y-auto flex items-center justify-center p-4 sm:p-6 bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-white transition-colors relative">
+            <div class="max-w-md w-full flex flex-col items-center text-center my-auto">
                 
                 <!-- PortalHub Branding (Centered) -->
                 <div class="flex items-center space-x-2.5 mb-5 select-none">
@@ -505,162 +509,171 @@
 
                 <!-- Pink Circle Avatar "F" -->
                 <div class="w-16 h-16 rounded-full bg-[#db2777] text-white font-bold text-2xl flex items-center justify-center mb-3 shadow-lg shadow-pink-500/20" id="pendingAvatarCircle">
-                    <span id="pendingAvatarLetter">F</span>
+                    <span id="pendingAvatarLetter"></span>
                 </div>
 
                 <!-- Title & Subtitle -->
-                <h2 class="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-1">Request Submitted!</h2>
+                <h2 class="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-1">Request sent</h2>
                 <div class="text-xs text-slate-500 dark:text-slate-400 font-medium">
                     Signed in as
-                    <span id="pendingUserEmailDisplay" class="text-blue-600 dark:text-cyan-400 font-mono text-sm block mt-0.5">felixpareja.pmdit07@gmail.com</span>
+                    <span id="pendingUserEmailDisplay" class="text-blue-600 dark:text-blue-400 font-medium text-sm block mt-0.5"></span>
                 </div>
 
                 <!-- Status Card -->
-                <div class="bg-white dark:bg-[#0e1726] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 text-left w-full my-6 space-y-2 shadow-md shadow-slate-200/50 dark:shadow-none">
+                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 text-left w-full my-6 space-y-2 shadow-md shadow-slate-200/50 dark:shadow-none">
                     <div class="flex items-center space-x-2 text-amber-600 dark:text-amber-400 font-semibold text-xs">
                         <i class="fa-regular fa-bell text-amber-500 dark:text-amber-400"></i>
                         <span class="font-bold tracking-wide">Awaiting Admin Approval</span>
                     </div>
                     <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
                         Your access request has been sent to the portal admin 
-                        (<span class="text-blue-600 dark:text-cyan-400 font-mono font-medium">felixpareja.pmdit07@gmail.com</span>). 
+                        (<span class="text-blue-600 dark:text-blue-400 font-medium">felixpareja.pmdit07@gmail.com</span>). 
                         Once approved, sign in again to access PortalHub.
                     </p>
                 </div>
 
                 <!-- Action Buttons -->
                 <div class="w-full space-y-3">
-                    <button onclick="checkApprovalStatus()" class="w-full py-3 px-4 rounded-xl bg-white hover:bg-slate-50 dark:bg-[#162338] dark:hover:bg-[#1d2d47] text-slate-700 dark:text-slate-200 font-medium text-xs border border-slate-300 dark:border-slate-700/60 transition-all flex items-center justify-center space-x-2 shadow-sm">
+                    <button onclick="checkApprovalStatus()" class="w-full py-3 px-4 rounded-xl bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium text-sm border border-slate-300 dark:border-slate-600 transition-all flex items-center justify-center space-x-2 shadow-sm">
                         <i class="fa-solid fa-rotate text-xs"></i>
                         <span>Check Approval Status</span>
                     </button>
 
-                    <button onclick="signOutAuth()" class="w-full py-3 px-4 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-[#162338]/60 dark:hover:bg-[#1d2d47] text-rose-700 dark:text-slate-300 font-medium text-xs border border-rose-200 dark:border-slate-800 transition-all flex items-center justify-center space-x-2">
+                    <button onclick="signOutAuth()" class="w-full py-3 px-4 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-transparent dark:hover:bg-slate-800 text-rose-700 dark:text-slate-300 font-medium text-sm border border-rose-200 dark:border-slate-700 transition-all flex items-center justify-center space-x-2">
                         <i class="fa-solid fa-arrow-right-from-bracket text-xs text-rose-500 dark:text-rose-400"></i>
                         <span>Sign Out</span>
                     </button>
                 </div>
 
                 <!-- Subtext Footer -->
-                <p class="text-[11px] text-slate-400 dark:text-slate-500 font-mono mt-8">PortalHub • Access-Gated</p>
+                <p class="text-xs text-slate-400 dark:text-slate-500 mt-8">PortalHub</p>
             </div>
         </div>
 
 
         <!-- VIEW 1: Full Central Dashboard -->
-        <div id="dashboardHomeView" class="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-            <div class="w-full max-w-[1600px] mx-auto space-y-5 sm:space-y-6 pb-12">
-                
-                <!-- ADMIN ACTION REQUIRED BANNER: Visible only to Admin when pending requests exist -->
-                <div id="adminPendingAlertBanner" class="hidden p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-amber-500/20 via-amber-500/15 to-orange-500/20 border-2 border-amber-500/40 text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl shadow-amber-500/10 animate-in fade-in slide-in-from-top-3">
-                    <div class="flex items-start sm:items-center space-x-3.5">
-                        <div class="w-11 h-11 rounded-2xl bg-amber-500/25 border border-amber-500/50 flex items-center justify-center text-amber-400 flex-shrink-0 animate-pulse">
-                            <i class="fa-solid fa-bell text-xl"></i>
+        <div id="dashboardHomeView" class="hidden flex-1 overflow-y-auto">
+            <div class="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-16 space-y-6">
+
+                <!-- ADMIN: pending access requests banner (visible only when requests exist) -->
+                <div id="adminPendingAlertBanner" class="hidden p-4 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-bell"></i>
                         </div>
-                        <div>
-                            <div class="font-extrabold text-sm sm:text-base text-white flex items-center space-x-2 flex-wrap gap-1.5">
-                                <span>Access Requests Awaiting Your Approval</span>
-                                <span id="adminPendingBannerCount" class="px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-xs">1</span>
-                                <span class="hidden sm:inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping mr-1.5"></span>
-                                    Auto-Refreshing
-                                </span>
+                        <div class="min-w-0">
+                            <div class="font-semibold text-sm text-amber-900 dark:text-amber-100 flex items-center gap-2">
+                                <span>Access requests waiting for you</span>
+                                <span id="adminPendingBannerCount" class="px-2 py-0.5 rounded-full bg-amber-500 text-white text-[11px] font-bold">1</span>
                             </div>
-                            <p id="adminPendingBannerDetail" class="text-xs text-amber-200/90 mt-0.5 leading-relaxed">
+                            <p id="adminPendingBannerDetail" class="text-xs text-amber-800/80 dark:text-amber-200/80 mt-0.5 truncate">
                                 Users have requested access to PortalHub.
                             </p>
                         </div>
                     </div>
-                    <button onclick="openAccessRequestsModal()" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-lg shadow-amber-500/30 transition-all flex items-center justify-center space-x-2 flex-shrink-0">
-                        <i class="fa-solid fa-user-check text-xs"></i>
-                        <span>Review & Approve Requests</span>
+                    <button onclick="openAccessRequestsModal()" class="h-9 px-4 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 shrink-0">
+                        <i class="fa-solid fa-user-check"></i>
+                        <span>Review requests</span>
                     </button>
                 </div>
-                
-                <!-- Welcome Hero Banner (Compact & Expansive) -->
-                <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 rounded-2xl sm:rounded-3xl p-4 sm:py-5 sm:px-7 text-white shadow-lg relative overflow-hidden flex flex-col justify-center">
-                    <div class="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
-                    <div class="relative z-10 w-full max-w-4xl">
-                        <div class="flex items-center space-x-2.5 mb-2">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white/20 backdrop-blur-md">
-                                <i class="fa-solid fa-network-wired mr-1.5"></i> PortalHub Gateway
-                            </span>
-                        </div>
-                        <h2 class="text-xl sm:text-2xl font-bold tracking-tight mb-1">Unified Service Gateway</h2>
-                        <p class="text-blue-100 text-xs sm:text-sm leading-relaxed">
-                            Unified launcher for your internal IP apps, local projects, and services.
-                        </p>
-                    </div>
+
+                <!-- Greeting -->
+                <div>
+                    <h2 id="dashboardGreeting" class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Welcome back</h2>
+                    <p id="dashboardSummary" class="text-sm text-slate-500 dark:text-slate-400 mt-1">Your services, one click away.</p>
                 </div>
 
-                <!-- Category Filtering & Count -->
-                <div class="space-y-3.5">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div>
-                            <h3 class="text-lg font-bold tracking-tight">Configured Services</h3>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">Filter services by category</p>
+                <!-- Toolbar: search, view switcher, add, category filters -->
+                <div class="space-y-3">
+                    <div class="flex items-center gap-2 sm:gap-3">
+                        <div class="relative flex-1 min-w-0 max-w-xl">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
+                            <input type="text" id="dashboardSearchInput" oninput="handleSearch(this.value)" onkeydown="handleSearchKeydown(event)" placeholder="Search services…" autocomplete="off" enterkeyhint="go" aria-label="Search services" class="w-full h-10 pl-10 pr-10 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 shadow-sm transition">
+                            <kbd id="searchShortcutHint" title="Press / to search" class="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 h-5 min-w-[20px] px-1.5 items-center justify-center rounded-md border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-[11px] font-mono text-slate-400 pointer-events-none">/</kbd>
+                            <button id="clearSearchBtn" onclick="clearSearch()" title="Clear search" class="hidden absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 dark:hover:text-slate-200 items-center justify-center transition-colors">
+                                <i class="fa-solid fa-xmark text-xs"></i>
+                            </button>
                         </div>
-                        <div class="flex items-center space-x-2.5">
-                            <span id="appCountBadge" class="px-3 py-1 rounded-full bg-slate-200 dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300">0 apps</span>
 
-                            <!-- View Type Toggle: 3D Carousel vs Grid vs Table -->
-                            <div class="flex items-center bg-slate-200/80 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
-                                <button id="viewCarouselBtn" onclick="setViewType('carousel')" title="3D Carousel View" class="flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm">
-                                    <i class="fa-solid fa-layer-group"></i>
-                                    <span class="hidden sm:inline">Carousel</span>
-                                </button>
-                                <button id="viewGridBtn" onclick="setViewType('grid')" title="Grid View" class="flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                        <div class="ml-auto flex items-center gap-2 shrink-0">
+                            <!-- View switcher: Grid (default) / List / Carousel -->
+                            <div role="group" aria-label="View" class="flex items-center p-1 rounded-xl bg-slate-200/70 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                                <button id="viewGridBtn" onclick="setViewType('grid')" title="Grid view">
                                     <i class="fa-solid fa-table-cells-large"></i>
-                                    <span class="hidden sm:inline">Grid</span>
+                                    <span class="hidden md:inline">Grid</span>
                                 </button>
-                                <button id="viewTableBtn" onclick="setViewType('table')" title="Table View" class="flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
-                                    <i class="fa-solid fa-table-list"></i>
-                                    <span class="hidden sm:inline">Table</span>
+                                <button id="viewTableBtn" onclick="setViewType('table')" title="List view">
+                                    <i class="fa-solid fa-list"></i>
+                                    <span class="hidden md:inline">List</span>
+                                </button>
+                                <button id="viewCarouselBtn" onclick="setViewType('carousel')" title="Carousel view">
+                                    <i class="fa-solid fa-layer-group"></i>
+                                    <span class="hidden md:inline">Carousel</span>
                                 </button>
                             </div>
+
+                            <button onclick="openAddAppModal()" title="Add app" class="h-10 px-3 sm:px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm flex items-center gap-2 transition-colors">
+                                <i class="fa-solid fa-plus"></i>
+                                <span class="hidden sm:inline">Add app</span>
+                            </button>
                         </div>
                     </div>
 
                     <!-- Category Pills -->
-                    <div id="categoryFilterBar" class="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none">
+                    <div id="categoryFilterBar" class="flex items-center gap-2 overflow-x-auto scrollbar-none -mx-1 px-1 py-0.5">
                         <!-- Populated dynamically -->
                     </div>
                 </div>
 
-                <!-- VIEW 0: 3D Carousel (Cover Flow) View -->
-                <div id="mainAppCarouselWrapper" class="space-y-3">
-                    <!-- Carousel Top Search & Navigation Bar -->
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 px-1">
-                        <div class="relative w-full max-w-md">
-                            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
-                            <input type="text" id="carouselSearchInput" oninput="handleCarouselSearch(this.value)" placeholder="Search configured services..." class="w-full pl-9 pr-8 py-2 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm transition-all">
-                            <button id="clearCarouselSearchBtn" onclick="clearCarouselSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 text-xs">
-                                <i class="fa-solid fa-xmark"></i>
-                            </button>
-                        </div>
-                        <div class="hidden sm:flex items-center space-x-2 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                            <span class="px-2.5 py-1 rounded-xl bg-slate-200/60 dark:bg-slate-800/70 border border-slate-300/40 dark:border-slate-700/50">
-                                <i class="fa-solid fa-arrow-left text-[10px] mr-1"></i><i class="fa-solid fa-arrow-right text-[10px]"></i> Arrows
-                            </span>
-                            <span class="px-2.5 py-1 rounded-xl bg-slate-200/60 dark:bg-slate-800/70 border border-slate-300/40 dark:border-slate-700/50">
-                                <i class="fa-solid fa-hand-pointer text-[10px] mr-1"></i> Drag / Click
-                            </span>
-                        </div>
+                <!-- VIEW A: App Cards Grid (default) -->
+                <div id="mainAppGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <!-- VIEW B: App List (Table) View -->
+                <div id="mainAppTableWrapper" class="hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    <th class="py-3 px-5">Service</th>
+                                    <th class="py-3 px-4">Category</th>
+                                    <th class="py-3 px-4 hidden sm:table-cell">Address</th>
+                                    <th class="py-3 px-4 hidden lg:table-cell">Description</th>
+                                    <th class="py-3 px-4 hidden md:table-cell">Opens in</th>
+                                    <th class="py-3 px-5 text-right"><span class="sr-only">Actions</span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="mainAppTableBody" class="divide-y divide-slate-100 dark:divide-slate-700/60 text-sm">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
                     </div>
 
+                    <!-- Table Pagination Footer (Page size: 15) -->
+                    <div id="tablePaginationFooter" class="px-5 py-3 border-t border-slate-100 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                        <span id="tablePaginationInfo" class="font-medium">Showing 0 services</span>
+                        <div class="flex items-center space-x-1.5" id="tablePaginationControls">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW C: 3D Carousel (Cover Flow) View -->
+                <div id="mainAppCarouselWrapper" class="hidden space-y-3">
                     <!-- 3D Perspective Stage Container -->
                     <div id="carousel3dContainer" class="carousel-3d-stage carousel-reflection-floor w-full h-[470px] sm:h-[510px] rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-inner relative flex items-center justify-center overflow-hidden">
                         <!-- Side Ambient Gradient Vignettes -->
-                        <div class="absolute inset-y-0 left-0 w-16 sm:w-28 bg-gradient-to-r from-slate-100 dark:from-[#070e17] to-transparent z-40 pointer-events-none"></div>
-                        <div class="absolute inset-y-0 right-0 w-16 sm:w-28 bg-gradient-to-l from-slate-100 dark:from-[#070e17] to-transparent z-40 pointer-events-none"></div>
+                        <div class="absolute inset-y-0 left-0 w-16 sm:w-28 bg-gradient-to-r from-slate-100 dark:from-slate-900 to-transparent z-40 pointer-events-none"></div>
+                        <div class="absolute inset-y-0 right-0 w-16 sm:w-28 bg-gradient-to-l from-slate-100 dark:from-slate-900 to-transparent z-40 pointer-events-none"></div>
 
                         <!-- Previous Slide Button -->
-                        <button id="carouselPrevBtn" onclick="prevCarouselSlide()" title="Previous Service (← Arrow)" class="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-50 w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-cyan-400 border border-slate-200/80 dark:border-slate-700 shadow-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md">
+                        <button id="carouselPrevBtn" onclick="prevCarouselSlide()" title="Previous service (←)" class="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-50 w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200/80 dark:border-slate-700 shadow-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md">
                             <i class="fa-solid fa-chevron-left text-sm"></i>
                         </button>
 
                         <!-- Next Slide Button -->
-                        <button id="carouselNextBtn" onclick="nextCarouselSlide()" title="Next Service (→ Arrow)" class="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-50 w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-cyan-400 border border-slate-200/80 dark:border-slate-700 shadow-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md">
+                        <button id="carouselNextBtn" onclick="nextCarouselSlide()" title="Next service (→)" class="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-50 w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200/80 dark:border-slate-700 shadow-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md">
                             <i class="fa-solid fa-chevron-right text-sm"></i>
                         </button>
 
@@ -671,11 +684,11 @@
                     </div>
 
                     <!-- Bottom Indicator and Status Bar -->
-                    <div class="flex flex-col sm:flex-row items-center justify-between gap-2.5 px-4 py-2.5 bg-white/80 dark:bg-slate-800/80 rounded-2xl border border-slate-200/70 dark:border-slate-700/60 shadow-sm text-xs">
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-2.5 px-4 py-2.5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm text-xs">
                         <div class="flex items-center space-x-2 text-slate-600 dark:text-slate-300 font-medium">
-                            <span id="carouselActiveCounter" class="font-bold text-blue-600 dark:text-blue-400">Service 1 of 7</span>
+                            <span id="carouselActiveCounter" class="font-bold text-blue-600 dark:text-blue-400">Service 1 of 1</span>
                             <span class="text-slate-300 dark:text-slate-600">•</span>
-                            <span id="carouselActiveCategory" class="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700/80 text-[11px] font-semibold text-slate-700 dark:text-slate-200">Finance</span>
+                            <span id="carouselActiveCategory" class="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700/80 text-[11px] font-semibold text-slate-700 dark:text-slate-200"></span>
                         </div>
 
                         <!-- Dots / Indicator Pills -->
@@ -683,50 +696,7 @@
                             <!-- Populated dynamically -->
                         </div>
 
-                        <div class="flex items-center space-x-2">
-                            <button onclick="openAddAppModal()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center space-x-1.5">
-                                <i class="fa-solid fa-plus text-[10px]"></i>
-                                <span>Add App</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- VIEW A: App Cards Grid -->
-                <div id="mainAppGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-5">
-                    <!-- Populated dynamically -->
-                </div>
-
-                <!-- VIEW B: App Table View -->
-                <div id="mainAppTableWrapper" class="hidden bg-white dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 rounded-3xl shadow-sm overflow-hidden transition-all">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr class="border-b border-slate-100 dark:border-slate-700/70 bg-slate-50/75 dark:bg-slate-800/60 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                    <th class="py-3.5 px-5">Service</th>
-                                    <th class="py-3.5 px-4">Category</th>
-                                    <th class="py-3.5 px-4">Endpoint / URL</th>
-                                    <th class="py-3.5 px-4 hidden md:table-cell">Description</th>
-                                    <th class="py-3.5 px-4 text-center">Status</th>
-                                    <th class="py-3.5 px-5 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="mainAppTableBody" class="divide-y divide-slate-100 dark:divide-slate-700/60 text-sm">
-                                <!-- Populated dynamically -->
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Table Pagination Footer (Page size: 15) -->
-                    <div id="tablePaginationFooter" class="px-5 py-3.5 border-t border-slate-100 dark:border-slate-700/70 bg-slate-50/70 dark:bg-slate-800/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
-                        <div class="flex items-center space-x-2">
-                            <span id="tablePaginationInfo" class="font-medium">Showing 0 services</span>
-                            <span class="text-slate-300 dark:text-slate-600">•</span>
-                            <span class="text-[11px] px-2 py-0.5 rounded-md bg-slate-200/60 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 font-mono">15 per page</span>
-                        </div>
-                        <div class="flex items-center space-x-1.5" id="tablePaginationControls">
-                            <!-- Populated dynamically -->
-                        </div>
+                        <span class="hidden sm:inline text-[11px] text-slate-400 dark:text-slate-500">← → to browse · Enter to open</span>
                     </div>
                 </div>
 
@@ -789,23 +759,24 @@
 
     </main>
 
-    <div id="appModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95">
+    <div id="appModal" onclick="if (event.target === this) closeAddAppModal()" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+        <div role="dialog" aria-modal="true" aria-labelledby="appModalTitle" class="bg-white dark:bg-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 max-h-[92vh] overflow-y-auto">
             <div class="flex items-center justify-between mb-4">
-                <h3 id="appModalTitle" class="text-lg font-bold">Add New IP App</h3>
-                <button onclick="closeAddAppModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <h3 id="appModalTitle" class="text-lg font-bold">Add app</h3>
+                <button onclick="closeAddAppModal()" title="Close" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 dark:hover:text-slate-200">
                     <i class="fa-solid fa-xmark text-lg"></i>
                 </button>
             </div>
             <form id="appForm" onsubmit="saveCustomApp(event)" class="space-y-4">
                 <input type="hidden" id="appEditId">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">App Name</label>
+                    <label for="appNameInput" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Name</label>
                     <input type="text" id="appNameInput" required placeholder="e.g. Proxmox VE" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">IP Address, URL, or Local Path</label>
-                    <input type="text" id="appUrlInput" required placeholder="e.g. http://192.168.1.100:8006 or file:///D:/PROJECTS/PSE/index.html" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+                    <label for="appUrlInput" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Address</label>
+                    <input type="text" id="appUrlInput" required placeholder="192.168.1.100:8006 or https://example.com" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+                    <p class="text-[11px] text-slate-400 mt-1">An IP, URL, or local path such as D:/PROJECTS/PSE/index.html</p>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -857,45 +828,41 @@
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Section</label>
+                        <label for="appSectionInput" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Quick launcher</label>
                         <select id="appSectionInput" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="favorite">Favorite (Your Favorites)</option>
-                            <option value="secondary">Secondary (Other Services)</option>
+                            <option value="favorite">Favorites</option>
+                            <option value="secondary">Other services</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Open Behavior</label>
+                        <label for="appLaunchModeInput" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Open in</label>
                         <select id="appLaunchModeInput" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="iframe">Embedded Frame (Fullscreen)</option>
-                            <option value="newtab">New Tab (For Google/YouTube/etc.)</option>
+                            <option value="iframe">PortalHub (full screen)</option>
+                            <option value="newtab">New browser tab</option>
                         </select>
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Gradient Theme</label>
-                    <select id="appColorInput" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="from-blue-500 to-indigo-600">Blue & Indigo</option>
-                        <option value="from-emerald-500 to-teal-600">Emerald & Teal</option>
-                        <option value="from-amber-500 to-orange-600">Amber & Orange</option>
-                        <option value="from-purple-500 to-pink-600">Purple & Pink</option>
-                        <option value="from-rose-500 to-red-600">Rose & Red</option>
-                        <option value="from-cyan-500 to-blue-600">Cyan & Blue</option>
-                    </select>
+                    <span class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Color</span>
+                    <input type="hidden" id="appColorInput" value="from-blue-500 to-indigo-600">
+                    <div id="appColorSwatches" role="radiogroup" aria-label="Icon color" class="flex flex-wrap gap-2">
+                        <!-- Populated dynamically -->
+                    </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Description</label>
-                    <textarea id="appDescInput" rows="2" placeholder="App description..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    <label for="appDescInput" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Description <span class="font-normal text-slate-400">(optional)</span></label>
+                    <textarea id="appDescInput" rows="2" placeholder="What is this service for?" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                 </div>
                 <div class="flex items-center justify-end space-x-3 pt-3">
                     <button type="button" onclick="closeAddAppModal()" class="px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">Cancel</button>
-                    <button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm shadow-md transition-colors">Save App</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-sm transition-colors">Save</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div id="settingsModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 max-h-[90vh] flex flex-col">
+    <div id="settingsModal" onclick="if (event.target === this) closeSettingsModal()" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+        <div role="dialog" aria-modal="true" class="bg-white dark:bg-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 max-h-[90vh] flex flex-col">
             <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
                 <h3 class="text-lg font-bold flex items-center space-x-2">
                     <i class="fa-solid fa-gear text-blue-600"></i>
@@ -978,8 +945,8 @@
     </div>
 
         <!-- MODAL: Access Requests (Theme-Synchronized) -->
-    <div id="accessRequestsModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-[#0b1320] text-slate-800 dark:text-white border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in-95 max-h-[92vh] flex flex-col">
+    <div id="accessRequestsModal" onclick="if (event.target === this) closeAccessRequestsModal()" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+        <div role="dialog" aria-modal="true" class="bg-white dark:bg-slate-800 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 rounded-3xl max-w-md w-full p-6 shadow-2xl max-h-[92vh] flex flex-col">
             
             <!-- Modal Header -->
             <div class="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800/80">
@@ -993,7 +960,7 @@
                     </div>
                 </div>
                 <div class="flex items-center space-x-1.5">
-                    <button type="button" onclick="refreshPendingRequestsState(); showToast('Checked for updated requests');" title="Refresh Requests Now" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer">
+                    <button type="button" onclick="refreshPendingRequestsState(true); showToast('Checked for updated requests');" title="Refresh Requests Now" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer">
                         <i class="fa-solid fa-rotate text-xs"></i>
                     </button>
                     <button onclick="closeAccessRequestsModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-white flex items-center justify-center transition-colors">
@@ -1048,37 +1015,6 @@
                     Close
                 </button>
             </div>
-        </div>
-    </div>
-
-    <!-- MODAL: Custom Family Member / Test Sign-In (Theme-Synchronized) -->
-    <div id="demoFamilySignInModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-[#0b1320] text-slate-800 dark:text-white border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl animate-in fade-in zoom-in-95">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-                <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
-                    <i class="fa-solid fa-user-plus text-blue-600 dark:text-cyan-400"></i>
-                    <span>Sign In with Any Account</span>
-                </h3>
-                <button onclick="closeDemoFamilySignInModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white">
-                    <i class="fa-solid fa-xmark text-sm"></i>
-                </button>
-            </div>
-
-            <form onsubmit="handleDemoSignInSubmit(event)" class="space-y-4 pt-4">
-                <div>
-                    <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Display Name</label>
-                    <input type="text" id="demoSignInName" required placeholder="e.g. Maria Pareja" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-[#070e17] border border-slate-300 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-cyan-500">
-                </div>
-                <div>
-                    <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Google Email Address</label>
-                    <input type="email" id="demoSignInEmail" required placeholder="e.g. maria.pareja@gmail.com" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-[#070e17] border border-slate-300 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-cyan-500 font-mono">
-                </div>
-
-                <div class="pt-2 flex space-x-2">
-                    <button type="button" onclick="closeDemoFamilySignInModal()" class="flex-1 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold">Cancel</button>
-                    <button type="submit" class="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 dark:bg-cyan-500 dark:hover:bg-cyan-600 text-white dark:text-slate-950 text-xs font-bold shadow-md">Sign In</button>
-                </div>
-            </form>
         </div>
     </div>
 
@@ -1161,74 +1097,144 @@
             }
         ];
 
-        let categories = JSON.parse(localStorage.getItem('myportal_categories')) || defaultCategories;
-        let apps = JSON.parse(localStorage.getItem('myportal_apps')) || defaultApps;
+        // Deep copies so later edits never mutate the defaults used by "Load Sample Apps"
+        let categories = JSON.parse(localStorage.getItem('myportal_categories')) || [...defaultCategories];
+        let apps = JSON.parse(localStorage.getItem('myportal_apps')) || JSON.parse(JSON.stringify(defaultApps));
         let currentActiveApp = null;
         let selectedCategoryFilter = 'All';
 
-        // 3D Carousel is now the primary default view
-        const storedView = localStorage.getItem('myportal_view_type');
-        const hasV2Pref = localStorage.getItem('myportal_view_type_v2');
-        let currentViewType = hasV2Pref ? (storedView || 'carousel') : 'carousel';
-        if (!hasV2Pref) {
-            localStorage.setItem('myportal_view_type', 'carousel');
-            localStorage.setItem('myportal_view_type_v2', 'true');
+        // Icon gradients offered in the Add/Edit app dialog (includes every sample app's color)
+        const APP_COLORS = [
+            'from-blue-500 to-indigo-600',
+            'from-sky-500 to-blue-600',
+            'from-cyan-500 to-blue-600',
+            'from-blue-600 to-cyan-500',
+            'from-emerald-500 to-teal-600',
+            'from-amber-500 to-orange-600',
+            'from-orange-500 to-amber-600',
+            'from-amber-500 to-red-500',
+            'from-rose-500 to-red-600',
+            'from-rose-500 to-pink-600',
+            'from-purple-500 to-pink-600',
+            'from-indigo-500 to-purple-600',
+            'from-slate-500 to-slate-700'
+        ];
+
+        // Escape untrusted text (app fields, Firestore access requests) before inserting it as HTML
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
+
+        // Encode a value as a JS string literal that is safe inside an inline on* attribute
+        function jsArg(value) {
+            return escapeHtml(JSON.stringify(String(value ?? '')));
+        }
+
+        // Grid is the default view; an explicit choice is remembered under a new key
+        // (older keys forced the carousel, so they are dropped)
+        const VIEW_TYPES = ['grid', 'table', 'carousel'];
+        const VIEW_STORAGE_KEY = 'portalhub_view_type';
+        let currentViewType = localStorage.getItem(VIEW_STORAGE_KEY);
+        if (!VIEW_TYPES.includes(currentViewType)) currentViewType = 'grid';
+        localStorage.removeItem('myportal_view_type');
+        localStorage.removeItem('myportal_view_type_v2');
 
         const TABLE_PAGE_SIZE = 15;
         let tableCurrentPage = 1;
 
         // 3D Carousel Navigation State
         let carouselActiveIndex = 0;
-        let carouselSearchQuery = '';
+        let searchQuery = '';
 
         function setViewType(type) {
+            if (!VIEW_TYPES.includes(type)) return;
             currentViewType = type;
-            localStorage.setItem('myportal_view_type', type);
-            localStorage.setItem('myportal_view_type_v2', 'true');
+            localStorage.setItem(VIEW_STORAGE_KEY, type);
             updateViewTypeUI();
             renderDashboardGrid();
         }
 
         function updateViewTypeUI() {
-            const carouselBtn = document.getElementById('viewCarouselBtn');
-            const gridBtn = document.getElementById('viewGridBtn');
-            const tableBtn = document.getElementById('viewTableBtn');
-            const carouselWrapper = document.getElementById('mainAppCarouselWrapper');
-            const gridEl = document.getElementById('mainAppGrid');
-            const tableWrapper = document.getElementById('mainAppTableWrapper');
+            const buttons = { grid: 'viewGridBtn', table: 'viewTableBtn', carousel: 'viewCarouselBtn' };
+            const views = { grid: 'mainAppGrid', table: 'mainAppTableWrapper', carousel: 'mainAppCarouselWrapper' };
 
-            const activeBtn = 'flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm';
-            const inactiveBtn = 'flex items-center space-x-1.5 px-3 py-1 rounded-lg font-medium transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white';
+            const baseBtn = 'flex items-center gap-1.5 h-8 px-2.5 md:px-3 rounded-lg text-xs font-semibold transition-colors';
+            const activeBtn = `${baseBtn} bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm`;
+            const inactiveBtn = `${baseBtn} text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white`;
 
-            if (carouselBtn) carouselBtn.className = currentViewType === 'carousel' ? activeBtn : inactiveBtn;
-            if (gridBtn) gridBtn.className = currentViewType === 'grid' ? activeBtn : inactiveBtn;
-            if (tableBtn) tableBtn.className = currentViewType === 'table' ? activeBtn : inactiveBtn;
-
-            if (carouselWrapper) carouselWrapper.classList.toggle('hidden', currentViewType !== 'carousel');
-            if (gridEl) gridEl.classList.toggle('hidden', currentViewType !== 'grid');
-            if (tableWrapper) tableWrapper.classList.toggle('hidden', currentViewType !== 'table');
+            VIEW_TYPES.forEach(type => {
+                const btn = document.getElementById(buttons[type]);
+                if (btn) {
+                    btn.className = currentViewType === type ? activeBtn : inactiveBtn;
+                    btn.setAttribute('aria-pressed', String(currentViewType === type));
+                }
+                const view = document.getElementById(views[type]);
+                if (view) view.classList.toggle('hidden', currentViewType !== type);
+            });
         }
 
-        function handleCarouselSearch(val) {
-            carouselSearchQuery = val || '';
-            const clearBtn = document.getElementById('clearCarouselSearchBtn');
-            if (clearBtn) clearBtn.classList.toggle('hidden', !carouselSearchQuery);
+        function syncSearchControls() {
+            const clearBtn = document.getElementById('clearSearchBtn');
+            const hint = document.getElementById('searchShortcutHint');
+            if (clearBtn) {
+                clearBtn.classList.toggle('hidden', !searchQuery);
+                clearBtn.classList.toggle('flex', !!searchQuery);
+            }
+            if (hint) hint.classList.toggle('invisible', !!searchQuery);
+        }
+
+        function handleSearch(val) {
+            searchQuery = val || '';
+            syncSearchControls();
             carouselActiveIndex = 0;
+            tableCurrentPage = 1;
             renderDashboardGrid();
         }
 
-        function clearCarouselSearch() {
-            carouselSearchQuery = '';
-            const input = document.getElementById('carouselSearchInput');
+        function clearSearch() {
+            const input = document.getElementById('dashboardSearchInput');
             if (input) input.value = '';
-            const clearBtn = document.getElementById('clearCarouselSearchBtn');
-            if (clearBtn) clearBtn.classList.add('hidden');
-            carouselActiveIndex = 0;
-            renderDashboardGrid();
+            handleSearch('');
         }
 
-        
+        // Enter opens the first match; Escape clears the search
+        function handleSearchKeydown(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const first = getFilteredDashboardApps()[0];
+                if (first) launchApp(first.id);
+            } else if (e.key === 'Escape') {
+                e.stopPropagation();
+                if (searchQuery) clearSearch();
+                else e.target.blur();
+            }
+        }
+
+        function renderGreeting() {
+            const greetingEl = document.getElementById('dashboardGreeting');
+            const summaryEl = document.getElementById('dashboardSummary');
+            if (greetingEl) {
+                const hour = new Date().getHours();
+                const partOfDay = hour < 12 ? 'morning' : (hour < 18 ? 'afternoon' : 'evening');
+                const rawName = (currentUser && (currentUser.name || currentUser.email || '')) || '';
+                const firstName = rawName.split(/[\s@._]/)[0];
+                greetingEl.innerText = firstName
+                    ? `Good ${partOfDay}, ${firstName.charAt(0).toUpperCase()}${firstName.slice(1)}`
+                    : `Good ${partOfDay}`;
+            }
+            if (summaryEl) {
+                const usedCategories = new Set(apps.map(a => a.category)).size;
+                summaryEl.innerText = apps.length === 0
+                    ? 'Add your first service to get started.'
+                    : `${apps.length} service${apps.length === 1 ? '' : 's'} in ${usedCategories} categor${usedCategories === 1 ? 'y' : 'ies'}`;
+            }
+        }
+
                 // ==========================================
         // AUTHENTICATION & ACCESS CONTROL SYSTEM (FIREBASE READY)
         // ==========================================
@@ -1424,16 +1430,6 @@
             }
         }
 
-        async function syncToFirestore(collection, docId, data) {
-            if (!isFirebaseActive || !window.firebase || !firebase.firestore) return;
-            try {
-                const db = firebase.firestore();
-                await db.collection(collection).doc(docId).set(data, { merge: true });
-            } catch(err) {
-                console.warn('Firestore write notice:', err);
-            }
-        }
-
         // ==========================================
         // REAL-TIME AUTO-REFRESH & CROSS-TAB SYNC
         // ==========================================
@@ -1474,12 +1470,17 @@
             });
 
             // Automatic live background refresh every 3 seconds for updated requests
+            // (local state only; the Firestore onSnapshot listeners deliver cloud changes in real time)
             setInterval(function() {
                 refreshPendingRequestsState();
             }, 3000);
         }
 
-        async function refreshPendingRequestsState() {
+        // Fallback server poll for the admin, throttled: every Firestore get() bills one read per document
+        const FIRESTORE_POLL_INTERVAL_MS = 30000;
+        let lastFirestorePollAt = 0;
+
+        async function refreshPendingRequestsState(forceServerCheck = false) {
             try {
                 const rawApproved = localStorage.getItem('portal_approved_users');
                 const localApproved = JSON.parse(rawApproved) || [MAIN_ADMIN_EMAIL];
@@ -1513,7 +1514,9 @@
 
                 // If Firebase is active and user is admin: poll Firestore directly to catch requests from other devices/browsers
                 const isAdmin = isCurrentUserAdmin();
-                if (isFirebaseActive && window.firebase && firebase.firestore && isAdmin) {
+                const pollDue = forceServerCheck || Date.now() - lastFirestorePollAt >= FIRESTORE_POLL_INTERVAL_MS;
+                if (isFirebaseActive && window.firebase && firebase.firestore && isAdmin && pollDue) {
+                    lastFirestorePollAt = Date.now();
                     try {
                         const db = firebase.firestore();
                         const snapshot = await db.collection('access_requests').get();
@@ -1639,18 +1642,15 @@
             const toggleBtn = document.getElementById('toggleAuthModeBtn');
             const submitBtn = document.getElementById('authSubmitBtn');
 
+            const baseSubmit = 'w-full h-11 px-4 text-white font-semibold text-sm rounded-xl shadow-sm flex items-center justify-center space-x-2 transition-colors';
             if (isRegisterMode) {
-                if (submitText) submitText.innerText = 'REGISTER & REQUEST ACCESS';
-                if (toggleBtn) toggleBtn.innerText = 'Already have an account? Sign In';
-                if (submitBtn) {
-                    submitBtn.className = 'w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold font-mono text-xs rounded-xl shadow-lg shadow-emerald-500/20 flex items-center justify-center space-x-2 transition-all';
-                }
+                if (submitText) submitText.innerText = 'Register & request access';
+                if (toggleBtn) toggleBtn.innerText = 'Already have an account? Sign in';
+                if (submitBtn) submitBtn.className = `${baseSubmit} bg-emerald-600 hover:bg-emerald-700`;
             } else {
-                if (submitText) submitText.innerText = 'SIGN IN';
-                if (toggleBtn) toggleBtn.innerText = "Don't have an account? Register";
-                if (submitBtn) {
-                    submitBtn.className = 'w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 dark:bg-[#22d3ee] dark:hover:bg-[#06b6d4] text-white dark:text-[#081528] font-extrabold font-mono text-xs rounded-xl shadow-lg shadow-blue-500/25 dark:shadow-cyan-500/15 flex items-center justify-center space-x-2 transition-all';
-                }
+                if (submitText) submitText.innerText = 'Sign in';
+                if (toggleBtn) toggleBtn.innerText = "Don't have an account? Request access";
+                if (submitBtn) submitBtn.className = `${baseSubmit} bg-blue-600 hover:bg-blue-700`;
             }
         }
 
@@ -1661,10 +1661,10 @@
 
             if (input.type === 'password') {
                 input.type = 'text';
-                icon.className = 'fa-regular fa-eye-slash text-xs text-blue-600 dark:text-cyan-400';
+                icon.className = 'fa-regular fa-eye-slash text-sm text-blue-600 dark:text-blue-400';
             } else {
                 input.type = 'password';
-                icon.className = 'fa-regular fa-eye text-xs text-slate-400 dark:text-slate-500';
+                icon.className = 'fa-regular fa-eye text-sm';
             }
         }
 
@@ -1680,26 +1680,6 @@
             } else {
                 showToast(`Password reset link sent to ${email}`);
             }
-        }
-
-        // 3. Guest / Demo Terminal View
-        function exploreDemoTerminal() {
-            processUserLogin({
-                name: 'Guest Investor',
-                email: 'demo.investor@portalhub.local',
-                picture: '',
-                role: 'guest',
-                status: 'approved'
-            });
-            showToast('Entered Demo Terminal (Guest View)');
-        }
-
-        function quickSignInAdmin() {
-            processUserLogin({
-                name: 'Felix Pareja',
-                email: MAIN_ADMIN_EMAIL,
-                picture: ''
-            });
         }
 
         async function processUserLogin(userData) {
@@ -1908,7 +1888,10 @@
             localStorage.setItem('portal_access_requests', JSON.stringify(pendingRequests));
 
             const pendingCount = pendingRequests.length;
-            if (pendingBadge) pendingBadge.innerText = pendingCount;
+            if (pendingBadge) {
+                pendingBadge.innerText = pendingCount;
+                pendingBadge.classList.toggle('hidden', pendingCount === 0);
+            }
             if (dropdownBadge) dropdownBadge.innerText = pendingCount;
 
             if (!currentUser) {
@@ -2000,18 +1983,9 @@
             }
 
             if (navReqBtn) {
-                if (isAdmin) {
-                    navReqBtn.classList.remove('hidden');
-                    navReqBtn.classList.add('flex');
-                    if (pendingCount > 0) {
-                        navReqBtn.classList.add('ring-2', 'ring-amber-400', 'animate-pulse');
-                    } else {
-                        navReqBtn.classList.remove('ring-2', 'ring-amber-400', 'animate-pulse');
-                    }
-                } else {
-                    navReqBtn.classList.add('hidden');
-                    navReqBtn.classList.remove('flex', 'ring-2', 'ring-amber-400', 'animate-pulse');
-                }
+                navReqBtn.classList.toggle('hidden', !isAdmin);
+                navReqBtn.classList.toggle('flex', isAdmin);
+                navReqBtn.title = pendingCount > 0 ? `Access requests (${pendingCount} waiting)` : 'Access requests';
             }
 
             if (menuReqLink) {
@@ -2029,11 +2003,13 @@
                 if (bannerCount) bannerCount.innerText = pendingCount;
                 if (bannerDetail) {
                     const firstReq = pendingRequests[0];
-                    bannerDetail.innerHTML = `<span class="font-mono text-cyan-300 font-semibold">${firstReq.email}</span> ${pendingCount > 1 ? `and ${pendingCount - 1} other user(s)` : ''} requested access to PortalHub.`;
+                    bannerDetail.innerHTML = `<span class="font-semibold">${escapeHtml(firstReq.email)}</span> ${pendingCount > 1 ? `and ${pendingCount - 1} other${pendingCount > 2 ? 's' : ''}` : ''} requested access.`;
                 }
             } else {
                 if (adminBanner) adminBanner.classList.add('hidden');
             }
+
+            renderGreeting();
         }
 
         function toggleUserDropdown() {
@@ -2057,7 +2033,7 @@
             renderAccessRequestsList();
             document.getElementById('accessRequestsModal').classList.remove('hidden');
             if (isFirebaseActive && window.firebase && firebase.firestore) {
-                refreshPendingRequestsState();
+                refreshPendingRequestsState(true);
             }
         }
 
@@ -2101,23 +2077,23 @@
                 container.innerHTML = `
                     <div class="space-y-3">
                         ${pendingRequests.map(req => `
-                            <div class="bg-slate-50 dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+                            <div class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 flex items-center justify-between shadow-sm">
                                 <div class="flex items-center space-x-3 overflow-hidden">
                                     <div class="w-10 h-10 rounded-full bg-[#db2777] text-white font-bold flex items-center justify-center shrink-0 shadow-md">
-                                        ${(req.name || req.email).charAt(0).toUpperCase()}
+                                        ${escapeHtml((req.name || req.email || '?').charAt(0).toUpperCase())}
                                     </div>
                                     <div class="overflow-hidden pr-2">
-                                        <h5 class="text-sm font-bold text-slate-900 dark:text-white truncate">${req.name || 'Family Member'}</h5>
-                                        <p class="text-xs text-blue-600 dark:text-cyan-400 font-mono truncate">${req.email}</p>
-                                        <p class="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">Requested: ${req.requestedAt}</p>
+                                        <h5 class="text-sm font-bold text-slate-900 dark:text-white truncate">${escapeHtml(req.name || 'Family Member')}</h5>
+                                        <p class="text-xs text-blue-600 dark:text-blue-400 truncate">${escapeHtml(req.email)}</p>
+                                        <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Requested ${escapeHtml(req.requestedAt)}</p>
                                     </div>
                                 </div>
                                 <div class="flex items-center space-x-2 shrink-0">
-                                    <button onclick="approveAccessRequest('${req.id}', '${req.email}')" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center space-x-1.5 shadow-sm transition-colors cursor-pointer">
+                                    <button onclick="approveAccessRequest(${jsArg(req.id)}, ${jsArg(req.email)})" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center space-x-1.5 shadow-sm transition-colors cursor-pointer">
                                         <i class="fa-solid fa-check text-[11px]"></i>
                                         <span>Approve</span>
                                     </button>
-                                    <button onclick="declineAccessRequest('${req.id}', '${req.email}')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-[#be123c]/40 dark:hover:bg-[#be123c]/60 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-xs font-semibold rounded-xl flex items-center space-x-1 transition-colors cursor-pointer">
+                                    <button onclick="declineAccessRequest(${jsArg(req.id)}, ${jsArg(req.email)})" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-[#be123c]/40 dark:hover:bg-[#be123c]/60 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-xs font-semibold rounded-xl flex items-center space-x-1 transition-colors cursor-pointer">
                                         <i class="fa-solid fa-xmark text-[11px]"></i>
                                         <span>Decline</span>
                                     </button>
@@ -2131,14 +2107,14 @@
             // Render Approved Members List
             if (approvedList) {
                 approvedList.innerHTML = approvedUsers.map(email => `
-                    <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-[#070e17] border border-slate-200 dark:border-slate-800/80 text-xs">
+                    <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs">
                         <div class="flex items-center space-x-2 overflow-hidden">
                             <span class="w-2 h-2 rounded-full ${email.toLowerCase() === MAIN_ADMIN_EMAIL.toLowerCase() ? 'bg-amber-500' : 'bg-emerald-500'}"></span>
-                            <span class="font-mono text-slate-700 dark:text-slate-300 truncate">${email}</span>
+                            <span class="text-slate-700 dark:text-slate-300 truncate">${escapeHtml(email)}</span>
                             ${email.toLowerCase() === MAIN_ADMIN_EMAIL.toLowerCase() ? '<span class="text-[10px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 rounded">Admin</span>' : ''}
                         </div>
                         ${email.toLowerCase() !== MAIN_ADMIN_EMAIL.toLowerCase() ? `
-                            <button onclick="revokeApprovedUser('${email}')" title="Revoke Access" class="text-slate-400 hover:text-rose-500 transition-colors p-1 cursor-pointer">
+                            <button onclick="revokeApprovedUser(${jsArg(email)})" title="Revoke Access" class="text-slate-400 hover:text-rose-500 transition-colors p-1 cursor-pointer">
                                 <i class="fa-solid fa-trash text-xs"></i>
                             </button>
                         ` : ''}
@@ -2332,11 +2308,9 @@
             notifyAccessRequestsChanged();
         }
 
-        function saveGoogleClientId() {
-        }
-
-        window.onload = function() {
-            initFirebase();
+        // Builds the UI from saved state. Called at the end of this script (the DOM above is already
+        // parsed), so the sign-in screen or dashboard never waits on Firebase, fonts, or icon downloads.
+        function initPortal() {
             const isAdmin = isCurrentUserAdmin();
             const fbArea = document.getElementById("firebaseConfigTextarea");
             if (fbArea) {
@@ -2349,7 +2323,6 @@
             updateAuthUI();
             setupCrossTabSyncAndAutoRefresh();
 
-            // Sample Apps Sync: Ensure default apps (6 sample apps) and default categories are available
             // Remove previous sample Ipon app if present
             if (apps.some(a => a.id === 'ipon' && (a.url || '').includes('ipon-pse-portfolio'))) {
                 apps = apps.filter(a => !(a.id === 'ipon' && (a.url || '').includes('ipon-pse-portfolio')));
@@ -2360,18 +2333,14 @@
                 categories = categories.filter(c => c !== 'Finance');
                 localStorage.setItem('myportal_categories', JSON.stringify(categories));
             }
-            defaultApps.forEach(sampleApp => {
-                if (!apps.some(a => a.id === sampleApp.id)) {
-                    apps.push(JSON.parse(JSON.stringify(sampleApp)));
-                }
-            });
-            defaultCategories.forEach(cat => {
-                if (!categories.includes(cat)) {
-                    categories.push(cat);
-                }
-            });
-            localStorage.setItem('myportal_apps', JSON.stringify(apps));
-            localStorage.setItem('myportal_categories', JSON.stringify(categories));
+            // Seed sample apps and categories on first run only, so deleted samples
+            // and "Start Empty" stay that way after a reload
+            if (localStorage.getItem('myportal_apps') === null) {
+                localStorage.setItem('myportal_apps', JSON.stringify(apps));
+            }
+            if (localStorage.getItem('myportal_categories') === null) {
+                localStorage.setItem('myportal_categories', JSON.stringify(categories));
+            }
 
             // Auto-heal any previously stored URLs corrupted with https://file:///
             let hasChanges = false;
@@ -2393,7 +2362,7 @@
             renderDrawerGrids();
             checkSystemTheme();
             checkLocalServerStatus();
-            
+
             // Close drawer or icon picker on outside click
             document.addEventListener('click', function(e) {
                 const drawer = document.getElementById('appGridDrawer');
@@ -2409,39 +2378,58 @@
                 }
             });
 
-            // Escape key closes open drawers or modals
+            // Keyboard: Escape closes the topmost open layer, "/" focuses search
             document.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape') {
-                    const drawer = document.getElementById('appGridDrawer');
-                    if (drawer && !drawer.classList.contains('hidden')) {
-                        closeAppGridDrawer();
+                    const iconDropdown = document.getElementById('iconPickerDropdown');
+                    if (iconDropdown && !iconDropdown.classList.contains('hidden')) {
+                        closeIconPickerDropdown();
+                        return;
                     }
-                    closeIconPickerDropdown();
+                    const isOpen = id => {
+                        const el = document.getElementById(id);
+                        return el && !el.classList.contains('hidden');
+                    };
+                    if (isOpen('appModal')) return closeAddAppModal();
+                    if (isOpen('settingsModal')) return closeSettingsModal();
+                    if (isOpen('accessRequestsModal')) return closeAccessRequestsModal();
+                    if (isOpen('appGridDrawer')) return closeAppGridDrawer();
+                    if (isOpen('userDropdownMenu')) return toggleUserDropdown();
+                    return;
+                }
+
+                if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+                    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+                    const dashboard = document.getElementById('dashboardHomeView');
+                    const search = document.getElementById('dashboardSearchInput');
+                    if (dashboard && !dashboard.classList.contains('hidden') && search && !document.querySelector('#appModal:not(.hidden), #settingsModal:not(.hidden), #accessRequestsModal:not(.hidden)')) {
+                        e.preventDefault();
+                        search.focus();
+                        search.select();
+                    }
                 }
             });
-        };
+        }
 
         // Render Category Filter Bar on Dashboard
         function renderCategoryFilterBar() {
             const bar = document.getElementById('categoryFilterBar');
-            const allCount = apps.length;
-            
-            let html = `
-                <button onclick="filterAppsByCategory('All')" class="px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${selectedCategoryFilter === 'All' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50'}">
-                    All Apps (${allCount})
-                </button>
-            `;
-
-            categories.forEach(cat => {
-                const count = apps.filter(a => a.category === cat).length;
-                html += `
-                    <button onclick="filterAppsByCategory('${cat}')" class="px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${selectedCategoryFilter === cat ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50'}">
-                        ${cat} (${count})
+            const pill = (value, label, count) => {
+                const active = selectedCategoryFilter === value;
+                const cls = active
+                    ? 'bg-blue-600 border-blue-600 text-white'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-500 hover:text-slate-900 dark:hover:text-white';
+                return `
+                    <button onclick="filterAppsByCategory(${jsArg(value)})" aria-pressed="${active}" class="h-8 px-3.5 rounded-full border text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 ${cls}">
+                        <span>${escapeHtml(label)}</span>
+                        <span class="${active ? 'text-blue-100' : 'text-slate-400 dark:text-slate-500'} font-medium">${count}</span>
                     </button>
                 `;
-            });
+            };
 
-            bar.innerHTML = html;
+            bar.innerHTML = pill('All', 'All', apps.length) +
+                categories.map(cat => pill(cat, cat, apps.filter(a => a.category === cat).length)).join('');
         }
 
         function filterAppsByCategory(category) {
@@ -2456,8 +2444,8 @@
                 ? apps 
                 : apps.filter(a => a.category === selectedCategoryFilter);
 
-            if (carouselSearchQuery && carouselSearchQuery.trim()) {
-                const q = carouselSearchQuery.trim().toLowerCase();
+            if (searchQuery && searchQuery.trim()) {
+                const q = searchQuery.trim().toLowerCase();
                 filtered = filtered.filter(a => 
                     (a.name && a.name.toLowerCase().includes(q)) ||
                     (a.url && a.url.toLowerCase().includes(q)) ||
@@ -2518,8 +2506,8 @@
                             <i class="fa-solid fa-layer-group text-2xl text-slate-400"></i>
                         </div>
                         <h4 class="font-bold text-base text-slate-800 dark:text-slate-100 mb-1">No services found</h4>
-                        <p class="text-xs text-slate-500 max-w-sm mb-4">No services match your active search or category filter.</p>
-                        <button onclick="clearCarouselSearch(); openAddAppModal();" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md cursor-pointer transition-all">Add Service</button>
+                        <p class="text-xs text-slate-500 max-w-sm mb-4">No services match your search or category filter.</p>
+                        <button onclick="clearFilters()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm cursor-pointer transition-colors">Clear filters</button>
                     </div>
                 `;
                 if (counterEl) counterEl.innerText = '0 services';
@@ -2537,41 +2525,35 @@
                         <div class="absolute top-0 right-0 w-36 h-36 bg-gradient-to-br ${app.color} opacity-10 rounded-bl-full pointer-events-none"></div>
                         <div>
                             <div class="flex items-center justify-between mb-3">
-                                <div class="flex items-center space-x-1.5">
-                                    <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300">
-                                        ${app.category}
-                                    </span>
-                                    <span class="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                        <span>Live</span>
-                                    </span>
-                                </div>
+                                <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300">
+                                    ${escapeHtml(app.category)}
+                                </span>
                                 <div class="flex items-center space-x-1" onclick="event.stopPropagation()">
-                                    <button onclick="event.stopPropagation(); openEditAppModal('${app.id}')" title="Edit App" class="w-7 h-7 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer">
+                                    <button onclick="event.stopPropagation(); openEditAppModal(${jsArg(app.id)})" title="Edit" class="w-7 h-7 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer">
                                         <i class="fa-solid fa-pen text-xs"></i>
                                     </button>
-                                    <button onclick="event.stopPropagation(); deleteApp('${app.id}')" title="Delete App" class="w-7 h-7 rounded-full hover:bg-rose-100 dark:hover:bg-rose-950/50 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors cursor-pointer">
+                                    <button onclick="event.stopPropagation(); deleteApp(${jsArg(app.id)})" title="Delete" class="w-7 h-7 rounded-full hover:bg-rose-100 dark:hover:bg-rose-950/50 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors cursor-pointer">
                                         <i class="fa-solid fa-trash text-xs"></i>
                                     </button>
                                 </div>
                             </div>
 
                             <div class="flex flex-col items-center text-center my-3">
-                                <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr ${app.color} flex items-center justify-center text-white shadow-lg shadow-blue-500/20 mb-3 group-hover:scale-105 transition-transform">
-                                    <i class="fa-solid ${app.icon} text-2xl sm:text-3xl"></i>
+                                <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr ${escapeHtml(app.color)} flex items-center justify-center text-white shadow-lg shadow-blue-500/20 mb-3 group-hover:scale-105 transition-transform">
+                                    <i class="fa-solid ${escapeHtml(app.icon)} text-2xl sm:text-3xl"></i>
                                 </div>
-                                <h4 class="font-bold text-lg sm:text-xl text-slate-800 dark:text-slate-100 tracking-tight mb-1">${app.name}</h4>
-                                <span class="font-mono text-xs text-slate-400 dark:text-slate-500 truncate max-w-[240px] block mb-2" title="${app.url}">${app.url}</span>
-                                <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed px-2">${app.description || 'No description provided.'}</p>
+                                <h4 class="font-bold text-lg sm:text-xl text-slate-800 dark:text-slate-100 tracking-tight mb-1">${escapeHtml(app.name)}</h4>
+                                <span class="font-mono text-xs text-slate-400 dark:text-slate-500 truncate max-w-[240px] block mb-2" title="${escapeHtml(app.url)}">${escapeHtml(displayUrl(app.url))}</span>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed px-2">${escapeHtml(app.description || 'No description provided.')}</p>
                             </div>
                         </div>
 
                         <div class="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between gap-2" onclick="event.stopPropagation()">
-                            <button onclick="event.stopPropagation(); launchApp('${app.id}')" class="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center justify-center space-x-1.5 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
+                            <button onclick="event.stopPropagation(); launchApp(${jsArg(app.id)})" class="flex-1 py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm flex items-center justify-center space-x-1.5 transition-colors cursor-pointer">
                                 <i class="fa-solid fa-play text-[10px]"></i>
-                                <span>Launch Service</span>
+                                <span>Open</span>
                             </button>
-                            <button onclick="event.stopPropagation(); window.open('${app.url}', '_blank')" title="Open in New Tab" class="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/70 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-200 flex items-center justify-center transition-all hover:scale-105 cursor-pointer">
+                            <button onclick="event.stopPropagation(); openAppInNewTab(${jsArg(app.id)})" title="Open in new tab" class="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/70 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-200 flex items-center justify-center transition-all hover:scale-105 cursor-pointer">
                                 <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
                             </button>
                         </div>
@@ -2581,7 +2563,7 @@
 
             if (dotsContainer) {
                 dotsContainer.innerHTML = filteredApps.map((a, i) => `
-                    <button onclick="selectCarouselIndex(${i})" title="${a.name}" class="cursor-pointer transition-all duration-300 ${i === carouselActiveIndex ? 'w-7 h-2.5 bg-blue-600 dark:bg-cyan-400 rounded-full shadow-sm shadow-blue-500/30' : 'w-2.5 h-2.5 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600 rounded-full'}"></button>
+                    <button onclick="selectCarouselIndex(${i})" title="${escapeHtml(a.name)}" class="cursor-pointer transition-all duration-300 ${i === carouselActiveIndex ? 'w-7 h-2.5 bg-blue-600 dark:bg-cyan-400 rounded-full shadow-sm shadow-blue-500/30' : 'w-2.5 h-2.5 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600 rounded-full'}"></button>
                 `).join('');
             }
 
@@ -2715,7 +2697,9 @@
                 const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
                 if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
                 
-                const anyModalOpen = document.querySelector('#accessRequestsModal:not(.hidden), #addAppModal:not(.hidden), #settingsModal:not(.hidden), #demoFamilySignInModal:not(.hidden), #appGridDrawer:not(.hidden)');
+                const dashboard = document.getElementById('dashboardHomeView');
+                if (!dashboard || dashboard.classList.contains('hidden')) return;
+                const anyModalOpen = document.querySelector('#accessRequestsModal:not(.hidden), #appModal:not(.hidden), #settingsModal:not(.hidden), #appGridDrawer:not(.hidden)');
                 if (anyModalOpen) return;
 
                 if (e.key === 'ArrowLeft') {
@@ -2733,84 +2717,103 @@
             });
         }
 
+        // Reset search and category filter together (used by the "no matches" empty state)
+        function clearFilters() {
+            selectedCategoryFilter = 'All';
+            const input = document.getElementById('dashboardSearchInput');
+            if (input) input.value = '';
+            searchQuery = '';
+            syncSearchControls();
+            carouselActiveIndex = 0;
+            tableCurrentPage = 1;
+            renderCategoryFilterBar();
+            renderDashboardGrid();
+        }
+
+        // Compact address for cards: drop the scheme and trailing slash
+        function displayUrl(url) {
+            return String(url || '').replace(/^https?:\/\//i, '').replace(/\/$/, '');
+        }
+
         // Render Dashboard App Cards & Table
         function renderDashboardGrid() {
             const grid = document.getElementById('mainAppGrid');
             const tableBody = document.getElementById('mainAppTableBody');
-            const countBadge = document.getElementById('appCountBadge');
-            
+
             const filteredApps = getFilteredDashboardApps();
 
-            countBadge.innerText = `${filteredApps.length} apps`;
-
-            // Always render 3D Carousel View
+            renderGreeting();
             renderCarouselView(filteredApps);
 
             if (filteredApps.length === 0) {
-                const emptyHtml = `
-                    <div class="col-span-full py-16 text-center">
-                        <div class="w-16 h-16 bg-slate-200 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
-                            <i class="fa-solid fa-folder-open text-2xl"></i>
+                const emptyHtml = apps.length === 0 ? `
+                    <div class="col-span-full py-14 px-6 text-center bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-600 rounded-2xl">
+                        <div class="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto mb-4">
+                            <i class="fa-solid fa-plus text-xl"></i>
                         </div>
-                        <h4 class="font-semibold text-base mb-1">No apps found</h4>
-                        <p class="text-xs text-slate-500 mb-4">No apps available in this category.</p>
-                        <button onclick="openAddAppModal()" class="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold shadow-md">Add IP App</button>
+                        <h4 class="font-semibold text-base text-slate-900 dark:text-white mb-1">No services yet</h4>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 mb-5">Add the apps and dashboards you use most, then open them from here.</p>
+                        <div class="flex items-center justify-center gap-2">
+                            <button onclick="openAddAppModal()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-colors">Add app</button>
+                            <button onclick="loadSampleApps()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-semibold transition-colors">Load samples</button>
+                        </div>
+                    </div>
+                ` : `
+                    <div class="col-span-full py-14 px-6 text-center">
+                        <div class="w-14 h-14 rounded-2xl bg-slate-200/70 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto mb-4">
+                            <i class="fa-solid fa-magnifying-glass text-xl"></i>
+                        </div>
+                        <h4 class="font-semibold text-base text-slate-900 dark:text-white mb-1">No matching services</h4>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 mb-5">${searchQuery.trim() ? `Nothing matches “${escapeHtml(searchQuery.trim())}”.` : 'This category has no services yet.'}</p>
+                        <button onclick="clearFilters()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-semibold transition-colors">Clear filters</button>
                     </div>
                 `;
                 if (grid) grid.innerHTML = emptyHtml;
-                if (tableBody) {
-                    tableBody.innerHTML = `
-                        <tr>
-                            <td colspan="6" class="py-16 text-center text-slate-400">
-                                <i class="fa-solid fa-folder-open text-2xl mb-2 block"></i>
-                                <span class="font-semibold text-sm block mb-1">No apps found</span>
-                                <span class="text-xs text-slate-500 block mb-4">No apps available in this category.</span>
-                                <button onclick="openAddAppModal()" class="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold shadow-md">Add IP App</button>
-                            </td>
-                        </tr>
-                    `;
-                }
+                if (tableBody) tableBody.innerHTML = `<tr><td colspan="6">${emptyHtml}</td></tr>`;
                 renderTablePagination(0, 1, 0, 0);
                 return;
             }
 
-            // Populate Grid View
+            const iconButton = 'w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 transition-colors';
+            const actionButtons = app => `
+                <button onclick="openAppInNewTab(${jsArg(app.id)})" title="Open in new tab" class="${iconButton} hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200">
+                    <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                </button>
+                <button onclick="openEditAppModal(${jsArg(app.id)})" title="Edit" class="${iconButton} hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200">
+                    <i class="fa-solid fa-pen text-xs"></i>
+                </button>
+                <button onclick="deleteApp(${jsArg(app.id)})" title="Delete" class="${iconButton} hover:bg-rose-50 dark:hover:bg-rose-950/50 hover:text-rose-500">
+                    <i class="fa-solid fa-trash text-xs"></i>
+                </button>
+            `;
+
+            // Populate Grid View (cards open the app; actions appear on hover/focus)
             if (grid) {
                 grid.innerHTML = filteredApps.map(app => `
-                    <div onclick="launchApp('${app.id}')" class="group bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between relative overflow-hidden cursor-pointer">
-                        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${app.color} opacity-5 group-hover:opacity-10 rounded-bl-full transition-opacity pointer-events-none"></div>
-                        <div>
-                            <div class="flex items-center justify-between mb-4">
-                                <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr ${app.color} flex items-center justify-center text-white shadow-md shadow-blue-500/10 group-hover:scale-110 transition-transform">
-                                    <i class="fa-solid ${app.icon} text-lg"></i>
-                                </div>
-                                <div class="flex items-center space-x-1" onclick="event.stopPropagation()">
-                                    <span class="text-[11px] font-medium px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">
-                                        ${app.category}
-                                    </span>
-                                    <button onclick="event.stopPropagation(); openEditAppModal('${app.id}')" title="Edit App" class="w-7 h-7 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                                        <i class="fa-solid fa-pen text-xs"></i>
-                                    </button>
-                                    <button onclick="event.stopPropagation(); deleteApp('${app.id}')" title="Delete App" class="w-7 h-7 rounded-full hover:bg-rose-100 dark:hover:bg-rose-950/50 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors">
-                                        <i class="fa-solid fa-trash text-xs"></i>
-                                    </button>
-                                </div>
+                    <div role="button" tabindex="0" onclick="launchApp(${jsArg(app.id)})" onkeydown="if (event.target === this && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); launchApp(${jsArg(app.id)}); }" aria-label="Open ${escapeHtml(app.name)}"
+                        class="group relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-slate-300 dark:hover:border-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-all duration-200 flex flex-col cursor-pointer">
+                        <div class="flex items-start justify-between gap-3 mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-tr ${escapeHtml(app.color)} flex items-center justify-center text-white shadow-sm shrink-0">
+                                <i class="fa-solid ${escapeHtml(app.icon)} text-lg"></i>
                             </div>
-                            <h4 class="font-bold text-base mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">${app.name}</h4>
-                            <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-4 leading-relaxed">${app.description || 'No description provided.'}</p>
+                            <div class="card-actions flex items-center -mr-1.5 -mt-1.5" onclick="event.stopPropagation()">
+                                ${actionButtons(app)}
+                            </div>
                         </div>
-                        <div class="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs">
-                            <span class="font-mono text-slate-400 dark:text-slate-500 truncate max-w-[180px]">${app.url}</span>
-                            <span class="text-blue-600 dark:text-blue-400 font-semibold flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <span>Open</span>
-                                <i class="fa-solid fa-chevron-right text-[10px]"></i>
-                            </span>
+                        <h4 class="font-semibold text-[15px] text-slate-900 dark:text-white flex items-center gap-1.5 min-w-0">
+                            <span class="truncate">${escapeHtml(app.name)}</span>
+                            ${opensInNewTab(app) ? '<i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-slate-400 shrink-0" title="Opens in a new tab"></i>' : ''}
+                        </h4>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mt-1 mb-4 leading-relaxed">${escapeHtml(app.description || '')}</p>
+                        <div class="mt-auto pt-3 border-t border-slate-100 dark:border-slate-700/70 flex items-center justify-between gap-2 text-xs">
+                            <span class="font-mono text-slate-400 dark:text-slate-500 truncate" title="${escapeHtml(app.url)}">${escapeHtml(displayUrl(app.url))}</span>
+                            <span class="shrink-0 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 font-medium">${escapeHtml(app.category)}</span>
                         </div>
                     </div>
                 `).join('');
             }
 
-            // Populate Table View (Paginated: 15 per page)
+            // Populate List View (Paginated: 15 per page)
             const totalTableItems = filteredApps.length;
             const totalTablePages = Math.max(1, Math.ceil(totalTableItems / TABLE_PAGE_SIZE));
             if (tableCurrentPage > totalTablePages) tableCurrentPage = totalTablePages;
@@ -2822,57 +2825,36 @@
 
             if (tableBody) {
                 tableBody.innerHTML = pagedTableApps.map(app => `
-                    <tr onclick="launchApp('${app.id}')" class="group hover:bg-slate-50/90 dark:hover:bg-slate-700/40 transition-colors cursor-pointer">
-                        <td class="py-3.5 px-5">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr ${app.color} flex items-center justify-center text-white shadow-sm shrink-0 group-hover:scale-105 transition-transform">
-                                    <i class="fa-solid ${app.icon} text-sm"></i>
+                    <tr onclick="launchApp(${jsArg(app.id)})" class="group hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors cursor-pointer">
+                        <td class="py-3 px-5">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-9 h-9 rounded-lg bg-gradient-to-tr ${escapeHtml(app.color)} flex items-center justify-center text-white shrink-0">
+                                    <i class="fa-solid ${escapeHtml(app.icon)} text-sm"></i>
                                 </div>
                                 <div class="min-w-0">
-                                    <div class="font-bold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors text-sm truncate flex items-center space-x-1.5">
-                                        <span>${app.name}</span>
-                                        ${app.launchMode === 'newtab' ? '<span class="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300">Tab</span>' : ''}
-                                    </div>
-                                    <span class="text-[11px] text-slate-400 dark:text-slate-500 font-mono truncate block sm:hidden">${app.url}</span>
+                                    <div class="font-semibold text-slate-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">${escapeHtml(app.name)}</div>
+                                    <div class="text-xs text-slate-400 dark:text-slate-500 font-mono truncate sm:hidden">${escapeHtml(displayUrl(app.url))}</div>
                                 </div>
                             </div>
                         </td>
-                        <td class="py-3.5 px-4 whitespace-nowrap">
-                            <span class="text-[11px] font-medium px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">
-                                ${app.category}
-                            </span>
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">${escapeHtml(app.category)}</span>
                         </td>
-                        <td class="py-3.5 px-4">
-                            <span class="font-mono text-xs text-slate-500 dark:text-slate-400 truncate max-w-[200px] sm:max-w-[260px] inline-block" title="${app.url}">
-                                ${app.url}
-                            </span>
+                        <td class="py-3 px-4 hidden sm:table-cell">
+                            <span class="font-mono text-xs text-slate-500 dark:text-slate-400 truncate max-w-[260px] inline-block align-middle" title="${escapeHtml(app.url)}">${escapeHtml(displayUrl(app.url))}</span>
                         </td>
-                        <td class="py-3.5 px-4 hidden md:table-cell">
-                            <p class="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[260px]" title="${app.description || ''}">
-                                ${app.description || '—'}
-                            </p>
+                        <td class="py-3 px-4 hidden lg:table-cell">
+                            <p class="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[280px]" title="${escapeHtml(app.description || '')}">${escapeHtml(app.description || '—')}</p>
                         </td>
-                        <td class="py-3.5 px-4 text-center whitespace-nowrap">
-                            <span class="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                <span>Online</span>
-                            </span>
+                        <td class="py-3 px-4 hidden md:table-cell whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
+                            ${opensInNewTab(app)
+                                ? '<i class="fa-solid fa-arrow-up-right-from-square mr-1.5"></i>New tab'
+                                : '<i class="fa-solid fa-expand mr-1.5"></i>PortalHub'}
                         </td>
-                        <td class="py-3.5 px-5 text-right whitespace-nowrap" onclick="event.stopPropagation()">
-                            <div class="flex items-center justify-end space-x-1">
-                                <button onclick="event.stopPropagation(); launchApp('${app.id}')" title="Launch in Fullscreen" class="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 text-xs font-semibold transition-colors flex items-center space-x-1">
-                                    <i class="fa-solid fa-play text-[10px]"></i>
-                                    <span class="hidden sm:inline">Launch</span>
-                                </button>
-                                <button onclick="event.stopPropagation(); window.open('${app.url}', '_blank')" title="Open in New Tab" class="w-7 h-7 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 flex items-center justify-center transition-colors">
-                                    <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
-                                </button>
-                                <button onclick="event.stopPropagation(); openEditAppModal('${app.id}')" title="Edit App" class="w-7 h-7 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                                    <i class="fa-solid fa-pen text-xs"></i>
-                                </button>
-                                <button onclick="event.stopPropagation(); deleteApp('${app.id}')" title="Delete App" class="w-7 h-7 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors">
-                                    <i class="fa-solid fa-trash text-xs"></i>
-                                </button>
+                        <td class="py-3 px-5 text-right whitespace-nowrap" onclick="event.stopPropagation()">
+                            <div class="flex items-center justify-end gap-0.5">
+                                <button onclick="launchApp(${jsArg(app.id)})" class="h-8 px-3 mr-1 rounded-lg bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-semibold transition-colors">Open</button>
+                                ${actionButtons(app)}
                             </div>
                         </td>
                     </tr>
@@ -2961,16 +2943,19 @@
             const favoriteApps = apps.filter(a => a.section === 'favorite' || !a.section);
             const secondaryApps = apps.filter(a => a.section === 'secondary');
 
-            if (favGrid) {
-                favGrid.innerHTML = favoriteApps.map(app => `
-                    <div onclick="closeAppGridDrawer(); launchApp('${app.id}');" class="group relative flex flex-col items-center p-2.5 rounded-2xl app-card-hover cursor-pointer transition-all text-center select-none">
-                        <span class="absolute top-2 right-3 w-2 h-2 rounded-full bg-emerald-500"></span>
-                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr ${app.color} flex items-center justify-center text-white shadow-sm mb-1.5 group-hover:scale-105 transition-transform pointer-events-none">
-                            <i class="fa-solid ${app.icon} text-base"></i>
-                        </div>
-                        <span class="text-[11px] font-medium text-slate-700 dark:text-slate-200 truncate w-full pointer-events-none">${app.name}</span>
+            const tile = app => `
+                <button type="button" onclick="closeAppGridDrawer(); launchApp(${jsArg(app.id)});" title="${escapeHtml(app.name)}" class="group relative flex flex-col items-center p-2.5 rounded-2xl app-card-hover cursor-pointer transition-all text-center select-none">
+                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr ${escapeHtml(app.color)} flex items-center justify-center text-white shadow-sm mb-1.5 group-hover:scale-105 transition-transform pointer-events-none">
+                        <i class="fa-solid ${escapeHtml(app.icon)} text-base"></i>
                     </div>
-                `).join('');
+                    <span class="text-[11px] font-medium text-slate-700 dark:text-slate-200 truncate w-full pointer-events-none">${escapeHtml(app.name)}</span>
+                </button>
+            `;
+
+            if (favGrid) {
+                favGrid.innerHTML = favoriteApps.length
+                    ? favoriteApps.map(tile).join('')
+                    : '<p class="col-span-3 text-xs text-slate-400 text-center py-4">No favorites yet</p>';
             }
 
             if (secSection) {
@@ -2982,15 +2967,7 @@
             }
 
             if (secGrid) {
-                secGrid.innerHTML = secondaryApps.map(app => `
-                    <div onclick="closeAppGridDrawer(); launchApp('${app.id}');" class="group relative flex flex-col items-center p-2.5 rounded-2xl app-card-hover cursor-pointer transition-all text-center select-none">
-                        <span class="absolute top-2 right-3 w-2 h-2 rounded-full bg-emerald-500"></span>
-                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr ${app.color} flex items-center justify-center text-white shadow-sm mb-1.5 group-hover:scale-105 transition-transform pointer-events-none">
-                            <i class="fa-solid ${app.icon} text-base"></i>
-                        </div>
-                        <span class="text-[11px] font-medium text-slate-700 dark:text-slate-200 truncate w-full pointer-events-none">${app.name}</span>
-                    </div>
-                `).join('');
+                secGrid.innerHTML = secondaryApps.map(tile).join('');
             }
         }
 
@@ -3021,7 +2998,12 @@
         let isLocalServerOnline = false;
 
         function checkLocalServerStatus() {
-            // Ping port 8088 to check if local gateway server is active
+            // Served over HTTP(S) already: nothing to probe
+            if (window.location.protocol !== 'file:') {
+                updateGatewayBadge(true);
+                return;
+            }
+            // file:// mode: ping port 8088 to check if local gateway server is active
             const testEndpoints = [
                 'http://127.0.0.1:8088/PSE/index.html',
                 'http://localhost:8088/PSE/index.html'
@@ -3054,9 +3036,16 @@
             if (!badge || !dot || !text) return;
 
             if (window.location.protocol.startsWith('http')) {
+                // Only the local gateway (serve.py) gets a badge; the hosted site needs none
+                const host = window.location.hostname;
+                const isLocalHost = host === 'localhost' || host === '[::1]' || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+                if (!isLocalHost) {
+                    badge.className = 'hidden';
+                    return;
+                }
                 badge.className = 'hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800';
-                dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse';
-                text.innerText = `Port ${window.location.port || '80'} Gateway`;
+                dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5';
+                text.innerText = `Local gateway${window.location.port ? ' :' + window.location.port : ''}`;
             } else if (isOnline) {
                 badge.className = 'hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800';
                 dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse';
@@ -3066,7 +3055,7 @@
                 dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5';
                 text.innerText = 'file:// Mode (Run start_portal.bat)';
                 badge.title = 'Click for info on embedding local files';
-                badge.onclick = () => alert('You are running MyPortal directly from a file:// URL. To embed local apps (like PSE) without browser security restrictions, double-click "start_portal.bat" in the Portal folder to launch via http://localhost:8088.');
+                badge.onclick = () => alert('You are running PortalHub directly from a file:// URL. To embed local apps (like PSE) without browser security restrictions, double-click "start_portal.bat" in the Portal folder to launch via http://localhost:8088.');
             }
         }
 
@@ -3162,8 +3151,7 @@
             return formatted;
         }
 
-        function forceIframeLoad(encodedUrl) {
-            const url = decodeURIComponent(encodedUrl);
+        function forceIframeLoad(url) {
             const iframe = document.getElementById('serviceIframe');
             const simulatedContainer = document.getElementById('simulatedAppContainer');
             if (simulatedContainer) simulatedContainer.classList.add('hidden');
@@ -3176,111 +3164,120 @@
             showToast('Loading URL in frame...');
         }
 
-        function renderBlockedSiteGateway(app, embedUrl) {
+        // Explain why a service can't be shown inside PortalHub and offer the alternatives
+        function renderLaunchNotice(app, embedUrl, notice) {
             const container = document.getElementById('simulatedAppContainer');
-            let domainName = app.url;
-            try {
-                domainName = new URL(embedUrl).hostname;
-            } catch(e) {}
-
             container.innerHTML = `
-                <div class="max-w-xl w-full bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl text-center space-y-5 animate-in fade-in zoom-in-95">
-                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr ${app.color} flex items-center justify-center text-white mx-auto shadow-lg text-2xl">
-                        <i class="fa-solid ${app.icon}"></i>
+                <div class="max-w-xl w-full bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl text-center space-y-5">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr ${escapeHtml(app.color)} flex items-center justify-center text-white mx-auto shadow-lg text-2xl">
+                        <i class="fa-solid ${escapeHtml(app.icon)}"></i>
                     </div>
                     <div>
-                        <h2 class="text-2xl font-bold text-white mb-1">${app.name}</h2>
-                        <p class="font-mono text-xs text-blue-400 truncate max-w-md mx-auto">${app.url}</p>
+                        <h2 class="text-2xl font-bold text-white mb-1">${escapeHtml(app.name)}</h2>
+                        <p class="font-mono text-xs text-blue-400 truncate max-w-md mx-auto">${escapeHtml(app.url)}</p>
                     </div>
 
                     <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 text-xs text-slate-300 text-left space-y-2">
                         <div class="flex items-center space-x-2 text-amber-400 font-semibold">
-                            <i class="fa-solid fa-shield-halved"></i>
-                            <span>Iframe Security Policy Notice</span>
+                            <i class="fa-solid ${notice.icon}"></i>
+                            <span>${notice.title}</span>
                         </div>
-                        <p class="text-slate-300 leading-relaxed">
-                            <strong>${domainName}</strong> enforces <code class="bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-mono text-[11px]">X-Frame-Options: SAMEORIGIN</code> to prevent clickjacking, which blocks modern browsers from displaying its full homepage inside an embedded frame.
-                        </p>
-                        <p class="text-slate-400 leading-relaxed text-[11px]">
-                            Internal IP apps (<strong>Proxmox, Portainer, Home Assistant, Pi-hole, NAS, Routers</strong>) and local services work directly in fullscreen. For external sites like Google or YouTube, click below to open directly in a new tab.
-                        </p>
+                        ${notice.body}
                     </div>
 
                     <div class="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-                        <button onclick="openInNewTab()" class="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/25 transition-all flex items-center justify-center space-x-2">
+                        <button onclick="openInNewTab()" class="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/25 transition-colors flex items-center justify-center space-x-2">
                             <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                            <span>Open in New Tab</span>
+                            <span>Open in new tab</span>
                         </button>
-                        <button onclick="forceIframeLoad('${encodeURIComponent(embedUrl)}')" class="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors">
-                            Attempt In-Frame Load
+                        <button onclick="forceIframeLoad(${jsArg(embedUrl)})" class="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors">
+                            Try loading here anyway
                         </button>
                         <button onclick="returnToDashboard()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl text-xs font-semibold transition-colors">
-                            Return to Dashboard
+                            Back to dashboard
                         </button>
                     </div>
                 </div>
             `;
         }
 
+        function renderBlockedSiteGateway(app, embedUrl) {
+            let domainName = app.url;
+            try {
+                domainName = new URL(embedUrl).hostname;
+            } catch(e) {}
+
+            renderLaunchNotice(app, embedUrl, {
+                icon: 'fa-shield-halved',
+                title: 'This site blocks embedding',
+                body: `
+                    <p class="text-slate-300 leading-relaxed">
+                        <strong>${escapeHtml(domainName)}</strong> sends <code class="bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-mono text-[11px]">X-Frame-Options</code>, so browsers won't display it inside another page.
+                    </p>
+                    <p class="text-slate-400 leading-relaxed text-[11px]">
+                        Self-hosted services (Proxmox, Portainer, Home Assistant, Pi-hole, NAS, routers) usually open fine here. To skip this screen, edit the app and set <strong>Open in</strong> to <strong>New browser tab</strong>.
+                    </p>
+                `
+            });
+        }
+
         function renderLocalFileGateway(app, embedUrl) {
-            const container = document.getElementById('simulatedAppContainer');
-            container.innerHTML = `
-                <div class="max-w-xl w-full bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl text-center space-y-5 animate-in fade-in zoom-in-95">
-                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr ${app.color} flex items-center justify-center text-white mx-auto shadow-lg text-2xl">
-                        <i class="fa-solid ${app.icon}"></i>
-                    </div>
-                    <div>
-                        <h2 class="text-2xl font-bold text-white mb-1">${app.name}</h2>
-                        <p class="font-mono text-xs text-blue-400 truncate max-w-md mx-auto">${app.url}</p>
-                    </div>
+            renderLaunchNotice(app, embedUrl, {
+                icon: 'fa-triangle-exclamation',
+                title: 'Local files need the PortalHub server',
+                body: `
+                    <p class="text-slate-300 leading-relaxed">
+                        PortalHub was opened from a <code class="bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-mono text-[11px]">file:///</code> address, and browsers block local files from loading inside each other.
+                    </p>
+                    <p class="text-slate-400 leading-relaxed text-[11px]">
+                        Double-click <code class="bg-slate-950 px-1.5 py-0.5 rounded text-blue-400 font-mono text-[11px]">start_portal.bat</code> in the Portal folder, then use <strong class="text-white">http://localhost:8088/Portal/</strong>. Local projects will open here directly.
+                    </p>
+                `
+            });
+        }
 
-                    <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 text-xs text-slate-300 text-left space-y-2">
-                        <div class="flex items-center space-x-2 text-amber-400 font-semibold">
-                            <i class="fa-solid fa-triangle-exclamation"></i>
-                            <span>Chromium Local File Security Policy</span>
-                        </div>
-                        <p class="text-slate-300 leading-relaxed">
-                            You opened MyPortal using a <code class="bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-mono text-[11px]">file:///</code> address. Modern browsers treat <code class="text-amber-300">file:</code> URLs as unique security origins and restrict iframe loading across different folders.
-                        </p>
-                        <p class="text-slate-400 leading-relaxed text-[11px]">
-                            <strong>How to enable fullscreen in-frame embedding:</strong><br>
-                            Double-click <code class="bg-slate-950 px-1.5 py-0.5 rounded text-blue-400 font-mono text-[11px]">start_portal.bat</code> in the Portal folder. This launches the unified gateway at <strong class="text-white">http://localhost:8088</strong>, allowing PSE and all local projects to embed seamlessly!
-                        </p>
-                    </div>
+        // An https page can't frame plain-http services (browsers block mixed content);
+        // loopback addresses are exempt because browsers treat them as secure
+        function isMixedContentBlocked(url) {
+            if (window.location.protocol !== 'https:') return false;
+            try {
+                const target = new URL(url, window.location.href);
+                return target.protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]'].includes(target.hostname);
+            } catch(e) {
+                return false;
+            }
+        }
 
-                    <div class="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-                        <button onclick="openInNewTab()" class="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/25 transition-all flex items-center justify-center space-x-2">
-                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                            <span>Open in New Tab</span>
-                        </button>
-                        <button onclick="forceIframeLoad('${encodeURIComponent(embedUrl)}')" class="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors">
-                            Attempt In-Frame Load
-                        </button>
-                        <button onclick="returnToDashboard()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl text-xs font-semibold transition-colors">
-                            Return to Dashboard
-                        </button>
-                    </div>
-                </div>
-            `;
+        function opensInNewTab(app) {
+            return app.launchMode === 'newtab' || isMixedContentBlocked(getEmbeddableUrl(app.url));
+        }
+
+        function openAppInNewTab(appId) {
+            const app = apps.find(a => a.id === appId);
+            if (!app) return;
+            // Local paths are routed through the gateway; everything else opens as entered
+            const url = isLocalFileUrl(app.url) ? getEmbeddableUrl(app.url) : app.url;
+            window.open(url, '_blank', 'noopener');
+            showToast(`Opened ${app.name} in a new tab`);
         }
 
         // Launch App Inside the Same Page in Fullscreen mode with sticky top-right nav
         function launchApp(appId) {
             const app = apps.find(a => a.id === appId);
             if (!app) return;
+
+            // Configured for a new tab, or an http service the secure (https) portal can't frame
+            if (opensInNewTab(app)) {
+                openAppInNewTab(app.id);
+                return;
+            }
+
             currentActiveApp = app;
 
             const embedUrl = getEmbeddableUrl(app.url);
             const isBlocked = isKnownIframeBlocked(app.url);
             const isLocal = isLocalFileUrl(app.url);
             const isFileOrigin = window.location.protocol === 'file:';
-
-            // If configured to open directly in a new tab
-            if (app.launchMode === 'newtab') {
-                window.open(app.url, '_blank');
-                showToast(`Opened ${app.name} in new tab`);
-                return;
-            }
 
             // Activate fullscreen mode
             document.body.classList.add('app-fullscreen-mode');
@@ -3334,19 +3331,7 @@
             const securityBanner = document.getElementById('iframeSecurityBanner');
             const blockedDomainSpan = document.getElementById('blockedDomainName');
 
-            // Untouched sample apps on dummy local IPs (e.g. 192.168.1.50:9000, 192.168.1.101:8006, 192.168.1.200:8123)
-            const isUntouchedSample = (
-                (app.id === 'portainer' && app.url === 'http://192.168.1.50:9000') ||
-                (app.id === 'proxmox' && app.url === 'http://192.168.1.101:8006') ||
-                (app.id === 'homeassistant' && app.url === 'http://192.168.1.200:8123')
-            );
-
-            if (isUntouchedSample) {
-                if (securityBanner) securityBanner.classList.add('hidden');
-                iframe.classList.add('hidden');
-                simulatedContainer.classList.remove('hidden');
-                renderSimulatedAppContent(app);
-            } else if (isBlocked) {
+            if (isBlocked) {
                 if (securityBanner) {
                     if (blockedDomainSpan) {
                         try {
@@ -3372,8 +3357,6 @@
                 iframe.classList.remove('hidden');
                 iframe.src = embedUrl;
             }
-
-            showToast(`Launched ${app.name} in Fullscreen`);
         }
 
         function returnToDashboard() {
@@ -3457,62 +3440,9 @@
 
         function openInNewTab() {
             if (!currentActiveApp) return;
-            window.open(currentActiveApp.url, '_blank');
+            openAppInNewTab(currentActiveApp.id);
         }
 
-        function renderSimulatedAppContent(app) {
-            const container = document.getElementById('simulatedAppContainer');
-            if (app.id === 'proxmox' || app.id === 'portainer') {
-                container.innerHTML = `
-                    <div class="max-w-4xl w-full text-left space-y-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h2 class="text-xl font-bold text-white">${app.name} Dashboard</h2>
-                                <p class="text-xs text-slate-400">Connected IP Node: <span class="font-mono text-emerald-400">${app.url}</span></p>
-                            </div>
-                            <span class="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-semibold rounded-full">Node Online</span>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-                                <span class="text-xs text-slate-400 block mb-1">CPU Load</span>
-                                <div class="text-2xl font-bold text-white mb-2">18.4%</div>
-                                <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                                    <div class="bg-blue-500 h-full w-1/5 rounded-full"></div>
-                                </div>
-                            </div>
-                            <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-                                <span class="text-xs text-slate-400 block mb-1">Memory Allocation</span>
-                                <div class="text-2xl font-bold text-white mb-2">14.2 GB / 32 GB</div>
-                                <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                                    <div class="bg-emerald-500 h-full w-2/5 rounded-full"></div>
-                                </div>
-                            </div>
-                            <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-                                <span class="text-xs text-slate-400 block mb-1">Active Containers</span>
-                                <div class="text-2xl font-bold text-white mb-2">24 Services</div>
-                                <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                                    <div class="bg-amber-500 h-full w-3/4 rounded-full"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            } else {
-                container.innerHTML = `
-                    <div class="max-w-xl w-full bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl text-center space-y-4">
-                        <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr ${app.color} flex items-center justify-center text-white mx-auto shadow-lg">
-                            <i class="fa-solid ${app.icon} text-2xl"></i>
-                        </div>
-                        <h2 class="text-2xl font-bold text-white">${app.name}</h2>
-                        <p class="text-sm text-slate-400">Connected to IP endpoint: <span class="font-mono text-blue-400">${app.url}</span></p>
-                        <div class="pt-4 flex items-center justify-center space-x-3">
-                            <button onclick="openInNewTab()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md transition-colors">Open in New Tab</button>
-                            <button onclick="returnToDashboard()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors">Return to Dashboard</button>
-                        </div>
-                    </div>
-                `;
-            }
-        }
 
         // ==========================================
         // FONTAWESOME SEARCHABLE ICON PICKER
@@ -3744,34 +3674,55 @@
             closeIconPickerDropdown();
         }
 
-        // Populate Category Dropdown
+        // Populate Category Dropdown (pre-selects the active filter when adding)
         function populateCategoryDropdown(selectedVal = '') {
             const select = document.getElementById('appCategoryInput');
             select.innerHTML = categories.map(cat => `
-                <option value="${cat}" ${cat === selectedVal ? 'selected' : ''}>${cat}</option>
+                <option value="${escapeHtml(cat)}" ${cat === selectedVal ? 'selected' : ''}>${escapeHtml(cat)}</option>
             `).join('');
+        }
+
+        // Color swatches; a stored color that isn't in the palette is kept as an extra swatch
+        function renderColorSwatches(selected) {
+            const container = document.getElementById('appColorSwatches');
+            const input = document.getElementById('appColorInput');
+            if (!container || !input) return;
+            const value = selected || APP_COLORS[0];
+            input.value = value;
+            const palette = APP_COLORS.includes(value) ? APP_COLORS : [value, ...APP_COLORS];
+            container.innerHTML = palette.map(color => {
+                const isSelected = color === value;
+                return `
+                    <button type="button" role="radio" aria-checked="${isSelected}" onclick="renderColorSwatches(${jsArg(color)})" title="${escapeHtml(color.replace(/from-|to-|-\d+/g, '').trim().replace(/\s+/, ' & '))}"
+                        class="w-8 h-8 rounded-lg bg-gradient-to-tr ${escapeHtml(color)} flex items-center justify-center text-white transition-transform hover:scale-110 ${isSelected ? 'ring-2 ring-offset-2 ring-blue-500 dark:ring-offset-slate-800' : ''}">
+                        ${isSelected ? '<i class="fa-solid fa-check text-xs"></i>' : ''}
+                    </button>
+                `;
+            }).join('');
         }
 
         // Modal Controls
         function openAddAppModal() {
             document.getElementById('appEditId').value = '';
-            document.getElementById('appModalTitle').innerText = 'Add New IP App';
+            document.getElementById('appModalTitle').innerText = 'Add app';
             document.getElementById('appForm').reset();
-            populateCategoryDropdown();
+            populateCategoryDropdown(selectedCategoryFilter !== 'All' ? selectedCategoryFilter : '');
             setIconPickerValue('fa-server');
+            renderColorSwatches(APP_COLORS[0]);
             document.getElementById('appLaunchModeInput').value = 'iframe';
             document.getElementById('appModal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('appNameInput').focus(), 50);
         }
 
         function openEditAppModal(appId) {
             const app = apps.find(a => a.id === appId);
             if (!app) return;
             document.getElementById('appEditId').value = app.id;
-            document.getElementById('appModalTitle').innerText = 'Edit IP App';
+            document.getElementById('appModalTitle').innerText = 'Edit app';
             document.getElementById('appNameInput').value = app.name;
             document.getElementById('appUrlInput').value = app.url;
             setIconPickerValue(app.icon || 'fa-server');
-            document.getElementById('appColorInput').value = app.color;
+            renderColorSwatches(app.color);
             document.getElementById('appSectionInput').value = app.section || 'favorite';
             document.getElementById('appLaunchModeInput').value = app.launchMode || (isKnownIframeBlocked(app.url) ? 'newtab' : 'iframe');
             document.getElementById('appDescInput').value = app.description || '';
@@ -3793,14 +3744,14 @@
 
             const appData = {
                 id: editId || ('app-' + Date.now()),
-                name: document.getElementById('appNameInput').value,
+                name: document.getElementById('appNameInput').value.trim(),
                 url: rawUrl,
                 category: document.getElementById('appCategoryInput').value,
                 section: document.getElementById('appSectionInput').value,
                 launchMode: launchMode,
                 icon: document.getElementById('appIconInput').value || 'fa-server',
-                color: document.getElementById('appColorInput').value,
-                description: document.getElementById('appDescInput').value
+                color: document.getElementById('appColorInput').value || APP_COLORS[0],
+                description: document.getElementById('appDescInput').value.trim()
             };
 
             if (editId) {
@@ -3860,7 +3811,7 @@
             const list = document.getElementById('settingsCategoryList');
             list.innerHTML = categories.map((cat, idx) => `
                 <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm">
-                    <span class="font-medium">${cat}</span>
+                    <span class="font-medium">${escapeHtml(cat)}</span>
                     <div class="flex items-center space-x-2">
                         <button onclick="renameCategory(${idx})" title="Rename Category" class="w-7 h-7 rounded hover:bg-slate-200 dark:hover:bg-slate-800 flex items-center justify-center text-slate-500 transition-colors">
                             <i class="fa-solid fa-pen text-xs"></i>
@@ -4014,19 +3965,30 @@
             });
         }
 
+        let toastTimer = null;
         function showToast(message) {
             const toast = document.getElementById('toastNotification');
             const messageEl = document.getElementById('toastMessage');
             messageEl.innerText = message;
-            
+
             toast.classList.remove('translate-y-20', 'opacity-0');
             toast.classList.add('translate-y-0', 'opacity-100');
-            
-            setTimeout(() => {
+
+            // Restart the timer so a new toast isn't hidden early by the previous one's timeout
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
                 toast.classList.remove('translate-y-0', 'opacity-100');
                 toast.classList.add('translate-y-20', 'opacity-0');
             }, 3000);
         }
+
+        initPortal();
+
+        // The Firebase SDKs are deferred, and deferred scripts run just before DOMContentLoaded
+        document.addEventListener('DOMContentLoaded', function() {
+            initFirebase();
+            updateAuthUI();
+        });
     </script>
 </body>
 </html>

@@ -11,14 +11,25 @@
 ## Features
 
 - **Google Authentication & Access Control**:
-  - Direct integration with Google Identity Services (`g_id_signin`).
+  - Google sign-in through Firebase Authentication (popup, with redirect fallback).
   - **Super Administrator**: `felixpareja.pmdit07@gmail.com` enjoys instant access and family approval authority.
   - **Access-Gated Family Approval Flow**: Non-admin sign-ins generate an access request awaiting admin verification.
   - **Admin Access Requests Modal**: Approve or decline family member sign-up requests, view processed statuses, and pre-approve members with 1 click.
 - **Unified Service Launcher**:
-  - Launch internal web applications (e.g. [Ipon PSE Portfolio](https://ipon-pse-portfolio.web.app/)) in fullscreen iframe mode.
-  - Sticky top-right floating navigation bar with app switcher drawer, popout, and reload capabilities.
-  - Flexible **Grid View** (<i class="fa-solid fa-table-cells-large"></i>) and **Table View** (<i class="fa-solid fa-table-list"></i>) toggling.
+  - Launch internal web applications in fullscreen iframe mode, or in a new tab for sites that block embedding.
+  - On the HTTPS-hosted site, plain-`http://` LAN services open in a new tab automatically (browsers block them inside a secure page).
+  - Collapsible side dock with app switcher, popout, reload, and fullscreen controls.
+  - **Grid view is the default**; **List** and 3D **Carousel** views are one click away, and your choice is remembered.
+  - One search box filters every view by name, address, category, or description.
+
+### Keyboard shortcuts
+
+| Key | Action |
+| --- | --- |
+| `/` | Focus the search box |
+| `Enter` (in search) | Open the first matching service |
+| `Esc` | Clear the search, or close the open dialog/menu |
+| `←` / `→` | Browse services in Carousel view |
 - **PWA & Mobile Ready**:
   - Full Apple mobile web app capability (`apple-mobile-web-app-capable: yes`, `black-translucent` status bar).
   - High-resolution `apple-touch-icon.png` and `manifest.json` for home screen install.
@@ -38,7 +49,8 @@ start_portal.bat
 
 ### 2. Launch via Python
 ```bash
-python serve.py
+python serve.py              # opens your browser automatically
+python serve.py --no-browser # server only
 ```
 Open your browser to:
 [http://localhost:8088/Portal/index.html](http://localhost:8088/Portal/index.html)
