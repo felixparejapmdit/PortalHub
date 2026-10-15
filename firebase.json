@@ -5,6 +5,7 @@
       "firebase.json",
       "firestore.rules",
       "**/.*",
+      "**/.*/**",
       "**/node_modules/**",
       "icons/source/**",
       "sites/**",
