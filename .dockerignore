@@ -1,0 +1,22 @@
+# Only the files the gateway serves go into the image
+.git
+.gitattributes
+.gitignore
+.dockerignore
+.firebase
+.firebaserc
+.env
+.vscode
+.idea
+__pycache__
+*.py[cod]
+icons/source
+sites
+scratch
+Dockerfile
+docker-compose.yml
+firebase.json
+firestore.rules
+start_portal.bat
+start_portal.sh
+README.md

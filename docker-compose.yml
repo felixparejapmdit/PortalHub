@@ -1,0 +1,28 @@
+# PortalHub on a NAS (Synology Container Manager, QNAP Container Station, TrueNAS, Unraid, ...)
+#
+#   docker compose up -d --build
+#
+# Then open http://<nas-address>:8088/ . Optional settings go in a .env file next to this one
+# (see "Deploy on a NAS" in README.md).
+services:
+  portalhub:
+    build: .
+    image: portalhub:latest
+    container_name: portalhub
+    restart: unless-stopped
+    ports:
+      - "${PORTALHUB_HOST_PORT:-8088}:8088"
+    environment:
+      # Address phones should use in QR codes (NAS IP or hostname). Optional: by default
+      # PortalHub uses the address you opened it with.
+      PORTALHUB_LAN_HOST: "${PORTALHUB_LAN_HOST:-}"
+      # Extra host names allowed to use the auto-fill API, e.g. a reverse-proxy domain
+      PORTALHUB_ALLOWED_HOSTS: "${PORTALHUB_ALLOWED_HOSTS:-}"
+      # Set to 1 to list the files of project folders that have no index.html
+      PORTALHUB_DIR_LISTING: "${PORTALHUB_DIR_LISTING:-0}"
+    # Run as a NAS user that can read your web projects (find the numbers with `id` over SSH)
+    user: "${PORTALHUB_UID:-65534}:${PORTALHUB_GID:-65534}"
+    volumes:
+      # Other web projects served next to PortalHub, read-only:
+      # <PORTALHUB_SITES>/PSE/index.html  ->  http://<nas-address>:8088/PSE/index.html
+      - "${PORTALHUB_SITES:-./sites}:/srv/www:ro"

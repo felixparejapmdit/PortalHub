@@ -7,8 +7,12 @@
       "**/.*",
       "**/node_modules/**",
       "icons/source/**",
+      "sites/**",
       "serve.py",
       "start_portal.bat",
+      "start_portal.sh",
+      "Dockerfile",
+      "docker-compose.yml",
       "README.md"
     ],
     "rewrites": [

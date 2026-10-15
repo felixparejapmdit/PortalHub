@@ -21,3 +21,7 @@ env/
 .system_generated/
 scratch/
 .firebase/
+
+# NAS / Docker: local settings and the optional folder of other web projects
+.env
+sites/

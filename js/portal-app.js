@@ -394,6 +394,8 @@ function getEmbeddableUrl(url) {
         }
     }
 
+    formatted = resolveLoopbackAddress(formatted);
+
     // Auto-convert YouTube watch URLs or youtu.be URLs to embed URLs
     const ytWatchMatch = formatted.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/i);
     if (ytWatchMatch && ytWatchMatch[1]) {
@@ -415,6 +417,30 @@ function isMixedContentBlocked(url) {
 
 function opensInNewTab(app) {
     return app.launchMode === 'newtab' || isMixedContentBlocked(getEmbeddableUrl(app.url));
+}
+
+// When PortalHub is served by the gateway on another machine (e.g. a NAS), "localhost" in an app's
+// address means that machine, not the viewer's device, so point such addresses at it instead.
+function resolveLoopbackAddress(url) {
+    if (!window.location.protocol.startsWith('http')) return url;
+    let parsed;
+    try {
+        parsed = new URL(url, window.location.href);
+    } catch(e) {
+        return url;
+    }
+    const loopback = ['localhost', '127.0.0.1', '[::1]'];
+    if (!loopback.includes(parsed.hostname) || loopback.includes(window.location.hostname)) return url;
+    // Only when the gateway serves this page (not on the Firebase-hosted site)
+    if (!gatewayInfo && !isPrivateHost(window.location.hostname)) return url;
+    const gatewayPort = String((gatewayInfo && gatewayInfo.port) || window.location.port || '');
+    const appPort = parsed.port || (parsed.protocol === 'https:' ? '443' : '80');
+    if (appPort === gatewayPort) {
+        // A project served by the gateway itself: use the address the viewer reached PortalHub with
+        return window.location.origin + parsed.pathname + parsed.search + parsed.hash;
+    }
+    parsed.hostname = window.location.hostname;
+    return parsed.href;
 }
 
 // Whether an app can be shown inside PortalHub (needed for split view)
@@ -470,8 +496,8 @@ function updateGatewayBadge(isOnline) {
     dot.className = 'w-1.5 h-1.5 rounded-full bg-current';
 
     if (window.location.protocol.startsWith('http')) {
-        // Only the local gateway (serve.py) gets a badge; the hosted site needs none
-        if (!isPrivateHost(window.location.hostname)) {
+        // Only the gateway (serve.py, e.g. on this PC or a NAS) gets a badge; the hosted site needs none
+        if (!gatewayInfo && !isPrivateHost(window.location.hostname)) {
             badge.className = 'hidden';
             return;
         }
@@ -489,12 +515,15 @@ function updateGatewayBadge(isOnline) {
 }
 
 // The gateway API exists only when PortalHub is served by serve.py on this machine or LAN
+// Also works behind a reverse-proxy domain; skipped on the Firebase-hosted site, which has no gateway
 async function detectGateway() {
-    if (!window.location.protocol.startsWith('http') || !isPrivateHost(window.location.hostname)) return;
+    const host = window.location.hostname;
+    if (!window.location.protocol.startsWith('http') || /\.(web\.app|firebaseapp\.com)$/i.test(host)) return;
     try {
         const res = await fetch('/api/info', { cache: 'no-store' });
         if (res.ok && (res.headers.get('content-type') || '').includes('application/json')) {
             gatewayInfo = await res.json();
+            updateGatewayBadge(true);
         }
     } catch(e) {}
 }
@@ -1478,7 +1507,7 @@ function openAppInNewTab(appId) {
     const app = apps.find(a => a.id === appId);
     if (!app) return;
     // Local paths are routed through the gateway; everything else opens as entered
-    const url = isLocalFileUrl(app.url) ? getEmbeddableUrl(app.url) : app.url;
+    const url = isLocalFileUrl(app.url) ? getEmbeddableUrl(app.url) : resolveLoopbackAddress(app.url);
     window.open(url, '_blank', 'noopener');
     noteAppOpened(app);
     renderDashboardIfVisible();
@@ -2023,7 +2052,9 @@ function loadScriptOnce(src) {
 function getShareableUrl(app) {
     let url;
     try {
-        const raw = isLocalFileUrl(app.url) || /^(\.{0,2}\/)/.test(app.url) ? getEmbeddableUrl(app.url) : normalizeAppUrl(app.url);
+        const raw = isLocalFileUrl(app.url) || /^(\.{0,2}\/)/.test(app.url)
+            ? getEmbeddableUrl(app.url)
+            : resolveLoopbackAddress(normalizeAppUrl(app.url));
         url = new URL(raw, window.location.href);
     } catch(e) {
         return { url: app.url, note: 'This address may not open on another device.' };
@@ -2031,11 +2062,12 @@ function getShareableUrl(app) {
     if (url.protocol === 'file:') {
         return { url: url.href, note: "Local files can't be opened from a phone. Start PortalHub with start_portal.bat to share local projects." };
     }
+    // Still a loopback address: this page was opened on the gateway machine itself
     if (['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) {
-        const ip = gatewayInfo && gatewayInfo.lan_ips && gatewayInfo.lan_ips[0];
-        if (ip) {
-            url.hostname = ip;
-            return { url: url.href, note: `Uses this computer's network address (${ip}) so phones on the same Wi-Fi can open it.` };
+        const address = gatewayInfo && gatewayInfo.lan_ips && gatewayInfo.lan_ips[0];
+        if (address) {
+            url.hostname = address;
+            return { url: url.href, note: `Uses the gateway's network address (${address}) so phones on the same Wi-Fi can open it.` };
         }
         return { url: url.href, note: 'This address only works on this computer. Run PortalHub through serve.py to get a network address.' };
     }
@@ -2073,7 +2105,21 @@ function closeQrModal() {
 
 async function copyQrUrl() {
     try {
-        await navigator.clipboard.writeText(qrCurrentUrl);
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(qrCurrentUrl);
+        } else {
+            // Plain-http pages (e.g. a NAS address) have no Clipboard API; use a hidden text field
+            const field = document.createElement('textarea');
+            field.value = qrCurrentUrl;
+            field.setAttribute('readonly', '');
+            field.style.position = 'fixed';
+            field.style.opacity = '0';
+            document.body.appendChild(field);
+            field.select();
+            const copied = document.execCommand('copy');
+            field.remove();
+            if (!copied) throw new Error('copy command refused');
+        }
         showToast('Link copied');
     } catch(e) {
         showToast('Copy failed: select the link and copy it manually', { error: true });

@@ -1,0 +1,12 @@
+# Files used on Linux (NAS, Docker) keep LF line endings even when checked out on Windows
+*.sh                text eol=lf
+Dockerfile          text eol=lf
+docker-compose.yml  text eol=lf
+.dockerignore       text eol=lf
+*.py                text eol=lf
+
+# Windows batch files need CRLF
+*.bat               text eol=crlf
+
+*.png               binary
+*.jpg               binary
